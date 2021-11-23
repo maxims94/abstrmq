@@ -1,6 +1,7 @@
 import asyncio
 from .task_manager import TaskManager
 import logging
+from .abstract_service import AbstractSession
 
 log = logging.getLogger(__name__)
 
@@ -12,10 +13,16 @@ class SessionManager(TaskManager):
   
   Subclass needs to set `SESSION_CLASS` as the class of the session
   It can also use `MAX_SESSIONS` to limit the number of concurrent sessions
+
+  To close a SessionManager, use TaskManager.close()!
   """
 
   def __init__(self):
     super().__init__()
+
+    assert hasattr(self, 'SESSION_CLASS')
+    assert issubclass(self.SESSION_CLASS, AbstractSession)
+
     self.sessions = []
     self._sema = None
     if hasattr(self, 'MAX_SESSIONS'):
@@ -42,7 +49,8 @@ class SessionManager(TaskManager):
     self.sessions.append(session)
     
     def on_done(fut):
-      #log.debug(f"on_done of session {session.corr_id}")
+      log.debug(f"on_done of session '{str(session)}'")
+
       session.close()
 
       if self._sema:
@@ -53,3 +61,7 @@ class SessionManager(TaskManager):
     t.add_done_callback(on_done)
 
     return session
+  
+  def is_full(self):
+    assert hasattr(self, 'MAX_SESSIONS')
+    return self._sema.locked()

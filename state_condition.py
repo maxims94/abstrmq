@@ -31,3 +31,7 @@ class StateCondition:
     self._state = state
     async with self._cond:
       self._cond.notify_all()
+
+  @property
+  def current(self):
+    return self._state

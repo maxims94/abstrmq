@@ -67,6 +67,8 @@ class FutureQueueException(Exception):
 
 class FutureQueue(BasicQueue):
   # TODO: wait; ensure that the task is interrupted after receive timeout
+
+  # TODO: make sure that there is no buffer overflow; timeout for messages? function to drop all waiting messages? better "mode"?
   """
 
   :param mode: Specifies behavior for unexpected messages, either a FutureQueueMode or a function that takes the unexpected message and returns a FutureQueueMode

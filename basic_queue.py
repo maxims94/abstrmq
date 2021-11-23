@@ -67,7 +67,7 @@ class QueueMessage:
   
   def get(self, key):
     if not key in self.content:
-      raise InvalidMessageError(f"Expected key '{key}', but not found")
+      raise InvalidMessageError(f"Expected key '{key}' not found")
     else:
       return self.content[key]
 

@@ -92,6 +92,8 @@ class FutureQueueSession:
   # Logging functions for subclasses
   #
 
+  # TODO: Use LoggerAdapter
+
   def info(self, msg):
     assert self.log
     self.log.info(msg, extra={'id': self.short_id()})
@@ -111,3 +113,9 @@ class FutureQueueSession:
   def critical(self, msg):
     assert self.log
     self.log.critical(msg, extra={'id': self.short_id()})
+
+  def __str__(self):
+    return str(self.corr_id)
+
+  def __repr__(self):
+    return f"<FutureQueueSession corr_id={self.corr_id}>"
