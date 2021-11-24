@@ -15,6 +15,16 @@ class SessionManager(TaskManager):
   It can also use `MAX_SESSIONS` to limit the number of concurrent sessions
 
   To close a SessionManager, use TaskManager.close()!
+
+  Two ways to use it
+  * MySession(AbstractSession)
+      * A session is a complex set of tasks with a main `run` task
+      * Within these tasks, real sessions can be created
+      * When receiving or publishing, you use other session objects (usually, FutureQueueSession)
+  * MySession(FutureQueueSession, AbstractSession)
+      * It still has a main `run` task
+      * But it is also a real session in the sense that it has a corr_id
+      * You use `self.receive` and `self.publish` for publishing
   """
 
   def __init__(self):
