@@ -28,6 +28,7 @@ class TaskManager:
       if not future.cancelled():
         if future.exception():
           #pdb.set_trace()
+          log.debug("Exception in on_done")
           # This will raise an exception
           # It will be passed to the global default exception handler since it is an exception raised in a callback function
           future.result()

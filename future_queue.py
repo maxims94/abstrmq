@@ -73,8 +73,9 @@ class FutureQueue(BasicQueue):
 
   :param mode: Specifies behavior for unexpected messages, either a FutureQueueMode or a function that takes the unexpected message and returns a FutureQueueMode
   """
-
-  WAIT_QUEUE_SIZE = 100
+  
+  # Dev: make this very small to notice failures quickly
+  WAIT_QUEUE_SIZE = 5
 
   def __init__(self, *args, mode : FutureQueueMode = FutureQueueMode.DROP, **kwargs):
     super().__init__(*args, **kwargs)
@@ -92,12 +93,14 @@ class FutureQueue(BasicQueue):
     log.debug(f"Process message {message!r}")
     
     found = False
+    n = 0
     for f in self._receive:
       if f.process(message):
         found = True
+        n += 1
 
     if found:
-      log.debug(f"Future(s) found for {message!r}")
+      log.debug(f"{n} Future(s) found for {message!r}")
 
     if not found:
       log.debug(f"No future found for {message!r}")

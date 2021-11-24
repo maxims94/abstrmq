@@ -17,6 +17,7 @@ class QueueMessage:
     properties = message.header.properties
     self.corr_id = properties.correlation_id
     self.reply_to = properties.reply_to
+    self.headers = properties.headers
     self.content = json.loads(self.body)
     assert isinstance(self.content, dict)
     self.delivery_tag = message.delivery.delivery_tag
@@ -94,12 +95,12 @@ class BasicQueue:
     """
     :raises asyncio.TimeoutError:
     """
-    log.debug("Initialize queue")
-
     if 'timeout' not in kwargs:
       kwargs['timeout'] = self.QUEUE_DECLARE_TIMEOUT
     result = await self._ch.queue_declare(queue=self._queue, **kwargs)
     self._name = result.queue
+
+    log.debug(f"Initialize queue '{self._name}'")
 
   async def delete_queue(self):
     assert self._name
@@ -135,5 +136,5 @@ class BasicQueue:
     log.debug("Received message (delivery_tag: %s)", message.delivery.delivery_tag)
     qm = QueueMessage(message)
     log.debug("Content: %s", qm.content)
-    log.debug(f"Properties: corr_id={qm.corr_id}, reply_to={qm.reply_to}, delivery_tag={qm.delivery_tag}")
+    log.debug(f"Properties: corr_id={qm.corr_id}, reply_to={qm.reply_to}, delivery_tag={qm.delivery_tag}, headers={qm.headers}")
     await self.on_message(qm)

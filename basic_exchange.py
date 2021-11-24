@@ -52,7 +52,15 @@ class BasicExchange:
     :raises asyncio.TimeoutError:
     """
 
-    log.debug(f"Bind '{queue}' to '{self._name}'")
+    if 'arguments' in kwargs:
+      header_str = ", ".join(f"{k}={v}" for k,v in kwargs['arguments'].items())
+      header_str = " with headers {" + header_str + "}"
+      log.debug(f"Bind '{queue}' to '{self._name}'" + header_str)
+    else:
+      log.debug(f"Bind '{queue}' to '{self._name}'")
+
+    # TODO: "with binding key" (e.g. for direct exchange)
+
 
     if 'timeout' not in kwargs:
       kwargs['timeout'] = self.EXCHANGE_BIND_TIMEOUT
