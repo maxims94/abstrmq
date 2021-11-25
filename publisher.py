@@ -43,18 +43,22 @@ class BasicPublisher:
 
     timeout = timeout or self.PUBLISH_TIMEOUT
 
-    await self._ch.basic_publish(
-      body,
-      exchange = exchange,
-      routing_key = routing_key,
-      properties = aiormq.spec.Basic.Properties(
-        correlation_id = corr_id,
-        delivery_mode = delivery_mode,
-        reply_to = reply_to,
-        headers = headers
-        ),
-      timeout = timeout
-    )
+    try:
+      await self._ch.basic_publish(
+        body,
+        exchange = exchange,
+        routing_key = routing_key,
+        properties = aiormq.spec.Basic.Properties(
+          correlation_id = corr_id,
+          delivery_mode = delivery_mode,
+          reply_to = reply_to,
+          headers = headers
+          ),
+        timeout = timeout
+      )
+    except asyncio.TimeoutError:
+      log.warning("Timeout while publishing")
+      raise
 
 class DirectPublisher(BasicPublisher):
   """
@@ -74,6 +78,8 @@ class DirectPublisher(BasicPublisher):
   async def init_dest_queue(self, **kwargs):
     """
     Initialize the destination queue (make sure that it exists)
+
+    :raises: TimeoutError
     """
     # TODO: passive=true should only **ensure** that it exists (throw an error if not)
 
