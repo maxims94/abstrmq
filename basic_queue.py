@@ -38,8 +38,19 @@ class QueueMessage:
   def __repr__(self):
     return f"<QueueMessage: {self.delivery_tag}>"
 
-  def match_dict(self, sub):
+  def match_dict(self, sub: dict):
     return _dict_subset(sub, self.content)
+
+  def assert_contains(self, sub: dict):
+    if not self.match_dict(sub):
+      raise InvalidMessageError(f"Doesn't contain {sub}")
+    return True
+
+  def assert_has_keys(self, *keys):
+    missing = set(keys) - self.content.keys()
+    if missing:
+      raise InvalidMessageError(f"Missing keys: {', '.join(missing)}")
+    return True
 
   def assert_message(self, callable, msg='Invalid message'):
     if not callable(self):
