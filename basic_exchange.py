@@ -14,6 +14,7 @@ class BasicExchange:
 
   EXCHANGE_DECLARE_TIMEOUT = 1
   EXCHANGE_BIND_TIMEOUT = 1
+  EXCHANGE_UNBIND_TIMEOUT = 1
 
   def __init__(self, ch, name='', type='direct'):
     self._ch = ch
@@ -59,13 +60,27 @@ class BasicExchange:
     else:
       log.debug(f"Bind '{queue}' to '{self._name}'")
 
-    # TODO: "with binding key" (e.g. for direct exchange)
-
+    # TODO: better log; "with binding key" (e.g. for direct exchange)
 
     if 'timeout' not in kwargs:
       kwargs['timeout'] = self.EXCHANGE_BIND_TIMEOUT
 
     await self._ch.queue_bind(queue, self._name, **kwargs)
+
+  async def unbind(self, queue: str, **kwargs):
+    """
+    Undoes a binding
+
+    :param queue: name of the queue
+    :raises asyncio.TimeoutError:
+    """
+
+    log.debug(f"Unbind '{queue}' from '{self._name}'")
+
+    if 'timeout' not in kwargs:
+      kwargs['timeout'] = self.EXCHANGE_UNBIND_TIMEOUT
+
+    await self._ch.queue_unbind(queue, self._name, **kwargs)
 
 class HeadersExchange(BasicExchange):
 
@@ -78,3 +93,10 @@ class HeadersExchange(BasicExchange):
     headers['x-match'] = match
 
     return await super().bind(queue, arguments=headers)
+
+  async def unbind(self, queue: str, headers: dict = {}, match='all'):
+    assert match in ['any', 'all']
+
+    headers['x-match'] = match
+
+    return await super().unbind(queue, arguments=headers)

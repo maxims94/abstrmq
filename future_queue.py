@@ -14,6 +14,7 @@ class MessageFuture(asyncio.Future):
   It will be set once a message is passed to it that satisfies the criteria
   """
   # TODO: match any / all
+  # TODO: match headers
 
   def __init__(self, match_dict = {}, corr_id=None, *args, **kwargs):
     super().__init__(*args, **kwargs)
@@ -57,10 +58,12 @@ class FutureQueueMode(Enum):
   DROP: ignore them / drop them
   STRICT: raise an error
   WAIT: wait (indefinitely) until a matching Future has been passed via receive
+  WAIT_WITH_DROP: Like WAIT, only that old messages are dropped if the buffer is full and they haven't been used
   """
   DROP = 'drop'
   STRICT = 'strict'
   WAIT = 'wait'
+  WAIT_WITH_DROP = 'wait_with_drop'
 
 class FutureQueueException(Exception):
   pass
@@ -118,11 +121,22 @@ class FutureQueue(BasicQueue):
       if selected_mode is FutureQueueMode.STRICT:
         raise FutureQueueException("Couldn't find a matching future for a message")
       if selected_mode is FutureQueueMode.WAIT:
+        assert len(self._wait) < self.WAIT_QUEUE_SIZE, "Message buffer full"
         log.debug(f"Add to wait queue: {message!s}")
         self._wait.append(message) 
-        assert len(self._wait) <= self.WAIT_QUEUE_SIZE
       if selected_mode is FutureQueueMode.DROP:
         log.warning(f"Drop message: {message!s}")
+      if selected_mode is FutureQueueMode.WAIT_WITH_DROP:
+        # At no point are two messages added, so == is enough
+        if len(self._wait) == self.WAIT_QUEUE_SIZE:
+          old_message = self._wait.pop(0)
+          log.warning(f"Dropped old message: {old_message!s}")
+
+          # Sanity check (could happen if you have multiple threads)
+          assert len(self._wait) < self.WAIT_QUEUE_SIZE
+
+        log.debug(f"Add to wait queue: {message!s}")
+        self._wait.append(message) 
 
   async def start_consume(self, **kwargs):
     await super().start_consume(self._process_message, **kwargs)
