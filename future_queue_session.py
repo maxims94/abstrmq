@@ -61,6 +61,10 @@ class FutureQueueSession:
           log.debug("Set corr_id to %s", self.corr_id)
         else:
           log.warning("Session received message without corr_id")
+      else:
+        if result.corr_id is not None:
+          if self.corr_id != result.corr_id:
+            log.critical("Received message with wrong corr_id")
       return result
 
   async def publish(self, *args, **kwargs):
