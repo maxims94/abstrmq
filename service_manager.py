@@ -21,7 +21,7 @@ class ServiceManager:
 
   async def run(self):
     """
-    When a Task running this coroutine is cancelled, the CancelledError is propagated to `await gather` inside the TaskManager. This, in turn, cancels all Tasks and will, in turn, raise a CancelledError. You don't need a `close()`!
+    You don't need a `close()`: When a Task running this coroutine is cancelled, this cancels `await gather`. This cancels all Tasks due to the internal logic of `gather`.
     """
     log.info("Run services")
 
