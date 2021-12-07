@@ -19,6 +19,9 @@ class RMQClient:
     self._conn = await aiormq.connect(*args, **kwargs)
 
   async def channel(self):
+    """
+    Raises Exception
+    """
     assert self._conn
     log.debug("Create new channel")
     ch = await self._conn.channel()

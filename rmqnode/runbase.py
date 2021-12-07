@@ -1,6 +1,7 @@
 import asyncio
 import signal
 import os
+import sys
 
 import logging
 log = logging.getLogger(__name__)
@@ -13,7 +14,8 @@ class RunBase:
   """
 
   def __init__(self):
-    self._main_task = None
+    self.main_task = None
+    self.exit_code = None
 
   def start(self):
     #asyncio.run(self._wrapper())
@@ -28,8 +30,8 @@ class RunBase:
       loop.add_signal_handler(signal.SIGINT, lambda: None)
       loop.remove_signal_handler(signal.SIGTERM)
       log.debug("Cancel main task")
-      assert self._main_task
-      self._main_task.cancel()
+      assert self.main_task
+      self.main_task.cancel()
     
     for sig in (signal.SIGINT, signal.SIGTERM):
       loop.add_signal_handler(sig, on_signal)
@@ -40,10 +42,13 @@ class RunBase:
 
     loop.set_exception_handler(handle_exception)
 
-    self._main_task = asyncio.create_task(self._main())
-    await self._main_task
+    self.main_task = asyncio.create_task(self.main())
+    await self.main_task
   
-  async def _main(self):
+  async def main(self):
+    """
+    Can be overriden by subclass
+    """
     log.debug("Start main")
 
     try:
