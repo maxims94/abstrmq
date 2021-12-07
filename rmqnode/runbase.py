@@ -15,11 +15,15 @@ class RunBase:
 
   def __init__(self):
     self.main_task = None
-    self.exit_code = None
+    self.cancellable = True
+    self.on_done = None
 
   def start(self):
     #asyncio.run(self._wrapper())
     asyncio.run(self._wrapper(), debug=True)
+    log.debug("Loop closed")
+    if self.on_done:
+      self.on_done()
 
   async def _wrapper(self):
 
@@ -29,15 +33,17 @@ class RunBase:
       log.debug("Termination signal received")
       loop.add_signal_handler(signal.SIGINT, lambda: None)
       loop.remove_signal_handler(signal.SIGTERM)
-      log.debug("Cancel main task")
-      assert self.main_task
-      self.main_task.cancel()
+      if self.cancellable:
+        log.debug("Cancel main task")
+        assert self.main_task
+        self.main_task.cancel()
+        self.cancellable = False
     
     for sig in (signal.SIGINT, signal.SIGTERM):
       loop.add_signal_handler(sig, on_signal)
 
     def handle_exception(loop, context):
-      log.error(f"Exception handler: {context.get('exception')}")
+      log.error(f"Global exception handler: {context.get('exception')}")
       loop.default_exception_handler(context)
 
     loop.set_exception_handler(handle_exception)
@@ -60,6 +66,7 @@ class RunBase:
       log.exception(ex)
 
     finally:
+      self.cancellable = False
       log.debug("Cleanup")
 
       try:
