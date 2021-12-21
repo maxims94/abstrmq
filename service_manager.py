@@ -13,7 +13,7 @@ class ServiceManager:
     assert name not in self._services
     self._services[name] = service
 
-  def __getattr__(self, key):
+  def get(self, key):
     if key in self._services:
       return self._services[key]
     else:

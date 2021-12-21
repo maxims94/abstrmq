@@ -92,7 +92,7 @@ class BasicQueue:
   QUEUE_DELETE_TIMEOUT = 1
   QUEUE_PURGE_TIMEOUT = 1
 
-  def __init__(self, ch, queue=''):
+  def __init__(self, ch, queue='', **init_kwargs):
     """
     :param queue: the name of the queue, empty string will create an anonymous queue
     """
@@ -100,20 +100,25 @@ class BasicQueue:
     self._queue = queue
     # Name of the confirmed / generated queue
     self._name = None
+    self._init_kwargs = init_kwargs
   
-  # TODO: change interface to declare, delete, purge?
-  async def init_queue(self, **kwargs):
+  async def declare(self, **kwargs):
     """
     :raises asyncio.TimeoutError:
     """
+    kwargs.update(self._init_kwargs)
+
     if 'timeout' not in kwargs:
       kwargs['timeout'] = self.QUEUE_DECLARE_TIMEOUT
+
+
     result = await self._ch.queue_declare(queue=self._queue, **kwargs)
     self._name = result.queue
 
-    log.debug(f"Initialize queue '{self._name}'")
+    kwargs_str = ', '.join([f'{k}={v}' for k,v in kwargs.items()])
+    log.debug(f"Declared queue '{self._name}' with {kwargs_str}")
 
-  async def delete_queue(self):
+  async def delete(self):
     assert self._name
     log.debug("Delete queue")
     await self._ch.queue_delete(queue=self._name, timeout=self.QUEUE_DELETE_TIMEOUT)
@@ -121,7 +126,7 @@ class BasicQueue:
     # TODO: the default is if_unused=True; if there is a subscriber, then that means it won't delete it?
     # TODO: does this delete all messages or only the queue itself?
 
-  async def purge_queue(self):
+  async def purge(self):
     assert self._name
     #log.debug("Purge queue")
     await self._ch.queue_purge(queue=self._name, timeout=self.QUEUE_PURGE_TIMEOUT)

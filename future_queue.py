@@ -58,12 +58,12 @@ class FutureQueueMode(Enum):
   DROP: ignore them / drop them
   STRICT: raise an error
   WAIT: wait (indefinitely) until a matching Future has been passed via receive
-  WAIT_WITH_DROP: Like WAIT, only that old messages are dropped if the buffer is full and they haven't been used
+  CIRCULAR: Like WAIT, only that old messages are dropped if the buffer is full and they haven't been used
   """
   DROP = 'drop'
   STRICT = 'strict'
   WAIT = 'wait'
-  WAIT_WITH_DROP = 'wait_with_drop'
+  CIRCULAR = 'circular'
 
 class FutureQueueException(Exception):
   pass
@@ -126,7 +126,7 @@ class FutureQueue(BasicQueue):
         self._wait.append(message) 
       if selected_mode is FutureQueueMode.DROP:
         log.warning(f"Drop message: {message!s}")
-      if selected_mode is FutureQueueMode.WAIT_WITH_DROP:
+      if selected_mode is FutureQueueMode.CIRCULAR:
         # At no point are two messages added, so == is enough
         if len(self._wait) == self.WAIT_QUEUE_SIZE:
           old_message = self._wait.pop(0)

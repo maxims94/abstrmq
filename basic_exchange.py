@@ -47,9 +47,13 @@ class BasicExchange:
 
   async def bind(self, queue: str, **kwargs):
     """
-    Creates a binding from this exchange to a queue
+    Create a binding from this exchange to a queue
+
+    NOTE: We define `bind` as a method of an exchange since e.g. a HeadersExchange has its own bind logic (while it is the same for any queue)
+
+    NOTE: Use the queue's name as argument instead of an object to keep it flat and decoupled
     
-    :param queue: name of the queue
+    :param queue: name of queue
     :raises asyncio.TimeoutError:
     """
 
