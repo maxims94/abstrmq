@@ -25,15 +25,19 @@ class ServiceManager:
     """
     log.info("Run services")
 
-    mgr = TaskManager()
+    # Use an instance so that we can reset it if necessary
+    # TODO: Maybe this is unnecessary and we should subclass from TaskManager instead
+    self._mgr = TaskManager()
 
     for k in self._services:
       log.info(f"Start '{k}' service")
       service = self._services[k]
-      mgr.create_task(service.run())
+      self._mgr.create_task(service.run())
 
-    await mgr.gather()
+    await self._mgr.gather()
 
-  # Currently not used
-  #async def close(self):
-  #  await mgr.close()
+  def cancel(self):
+    self._mgr.cancel()
+
+  async def close(self):
+    await self._mgr.close()

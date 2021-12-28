@@ -34,11 +34,17 @@ class TaskManager:
           future.result()
 
   def cancel(self):
+    """
+    Only send cancel signal
+    """
     for t in self._tasks:
       #log.debug("cancel")
       t.cancel()
 
   async def close(self):
+    """
+    Send cancel signal and wait
+    """
     self.cancel()
     await self.gather()
 

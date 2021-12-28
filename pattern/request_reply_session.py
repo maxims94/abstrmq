@@ -7,7 +7,7 @@ General pattern:
 A client makes a single request to a server
 It provides a reply queue and a correlation ID
 The server receives the request
-Processes it
+It processes the request and generates a reply
 Then sends a reply back to the client
 """
 
@@ -52,6 +52,7 @@ class RequestReplyClientSession(FutureQueueSession):
 
     :validator: a callable that takes a QueueMessage and validates it; raises RemoteError if a requirement is violated
     :raises: TimeoutError, CancelledError, RemoteError
+    :rtype: QueueMessage
     """
     timeout = timeout or self.RECEIVE_REPLY_TIMEOUT
     msg = await super().receive(timeout=timeout)
@@ -61,6 +62,8 @@ class RequestReplyClientSession(FutureQueueSession):
 
 class RequestReplyServerSession(FutureQueueSession):
   """
+  Validator: It only checks the format of the request, it does NOT need to guarantee that its associated operation will be successful!
+
   Usage:
 
   session = RequestReplyServerSession(request_queue)
@@ -86,6 +89,8 @@ class RequestReplyServerSession(FutureQueueSession):
     Validate the request. If it fails, a RemoteError is thrown (this is the behavior expected from the custom validator)
     
     If it is valid, return the request. It is expected that the server will process it now.
+
+    :rtype: QueueMessage
     """
     msg = await self.receive(*args, **kwargs)
 
