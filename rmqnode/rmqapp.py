@@ -7,5 +7,9 @@ class RMQApp:
     # Guaranteed to be set before run() is invoked
     self.client = None
 
+    # The app can define a custom global exception handler
+    # Will be used in RunBase
+    self.global_exception_handler = None
+
   async def run(self):
     raise NotImplementedError

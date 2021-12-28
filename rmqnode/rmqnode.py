@@ -69,7 +69,7 @@ class RMQNode(RunBase):
         log.error(f"Unexpected error: {ex}")
         sys.exit(1)
       else:
-        self.client.on_close = self.on_close
+        self.client.on_close = self._on_conn_close
         log.info("Connection established")
         break
 
@@ -90,6 +90,10 @@ class RMQNode(RunBase):
 
     self.app = self._app_cls()
     self.app.client = self.client
+    def app_handler(exc):
+      if self.app.global_exception_handler:
+        return self.app.global_exception_handler(exc)
+    self.global_exception_handler = app_handler
 
     try:
       log.debug("App start")
@@ -127,7 +131,7 @@ class RMQNode(RunBase):
 
       self.start()
   
-  def on_close(self):
+  def _on_conn_close(self):
     if self.cancellable:
       log.info("Connection failed")
       log.info("Cancel main task")

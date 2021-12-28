@@ -14,9 +14,13 @@ class RunBase:
   """
 
   def __init__(self):
+    """
+    :param global_exception_handler: a callable that takes an exc object. If it returns False, the default exception handler of RunBase will be suppressed
+    """
     self.main_task = None
     self.cancellable = True
     self.on_done = None
+    self.global_exception_handler = None
 
   def start(self):
     #asyncio.run(self._wrapper())
@@ -43,6 +47,10 @@ class RunBase:
       loop.add_signal_handler(sig, on_signal)
 
     def handle_exception(loop, context):
+      exc = context.get('exception')
+      if self.global_exception_handler:
+        if self.global_exception_handler(exc) is False:
+          return
       log.error(f"Global exception handler: {context.get('exception')}")
       loop.default_exception_handler(context)
 
