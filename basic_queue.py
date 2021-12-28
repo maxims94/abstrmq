@@ -13,13 +13,15 @@ from .basic_exchange import BasicExchange
 
 class QueueMessage:
   def __init__(self, message:aiormq.abc.DeliveredMessage):
+    """
+    :raises: JSONDecodeError
+    """
     self.body = message.body.decode()
     properties = message.header.properties
     self.corr_id = properties.correlation_id
     self.reply_to = properties.reply_to
     self.headers = properties.headers
     self.content = json.loads(self.body)
-    assert isinstance(self.content, dict)
     self.delivery_tag = message.delivery.delivery_tag
     self.ch = message.channel
     self._message = message
@@ -40,6 +42,9 @@ class QueueMessage:
 
   def match_dict(self, sub: dict):
     return _dict_subset(sub, self.content)
+
+  def match_headers_dict(self, sub: dict):
+    return _dict_subset(sub, self.headers)
 
   def assert_contains(self, sub: dict):
     if not self.match_dict(sub):

@@ -14,11 +14,11 @@ class MessageFuture(asyncio.Future):
   It will be set once a message is passed to it that satisfies the criteria
   """
   # TODO: match any / all
-  # TODO: match headers
 
-  def __init__(self, match_dict = {}, corr_id=None, *args, **kwargs):
+  def __init__(self, match = {}, headers = {}, corr_id=None, *args, **kwargs):
     super().__init__(*args, **kwargs)
-    self._match_dict = match_dict
+    self._match_dict = match
+    self._headers_dict = headers
     self._corr_id = corr_id
     self._result_value = None
 
@@ -31,6 +31,10 @@ class MessageFuture(asyncio.Future):
 
     if self._match_dict:
       if not msg.match_dict(self._match_dict):
+        return False
+
+    if self._headers_dict:
+      if not msg.match_headers_dict(self._headers_dict):
         return False
 
     if self._corr_id:
@@ -55,10 +59,10 @@ class FutureQueueMode(Enum):
   """
   What do we do with messages for which no Future has been found?
 
-  DROP: ignore them / drop them
-  STRICT: raise an error
-  WAIT: wait (indefinitely) until a matching Future has been passed via receive
-  CIRCULAR: Like WAIT, only that old messages are dropped if the buffer is full and they haven't been used
+  DROP: drop unmatched messages
+  STRICT: raise an error if a message can't be matched
+  WAIT: wait (indefinitely) until a matching Future has been passed via receive (this is NOT safe as it might lead to a buffer overflow!)
+  CIRCULAR: Like WAIT, only that old messages are dropped if the buffer is full and they haven't been used (buffer overflow safe!)
   """
   DROP = 'drop'
   STRICT = 'strict'
@@ -122,7 +126,7 @@ class FutureQueue(BasicQueue):
         raise FutureQueueException("Couldn't find a matching future for a message")
       if selected_mode is FutureQueueMode.WAIT:
         assert len(self._wait) < self.WAIT_QUEUE_SIZE, "Message buffer full"
-        log.debug(f"Add to wait queue: {message!s}")
+        log.debug(f"Add to queue: {message!s}")
         self._wait.append(message) 
       if selected_mode is FutureQueueMode.DROP:
         log.warning(f"Drop message: {message!s}")
@@ -135,7 +139,7 @@ class FutureQueue(BasicQueue):
           # Sanity check (could happen if you have multiple threads)
           assert len(self._wait) < self.WAIT_QUEUE_SIZE
 
-        log.debug(f"Add to wait queue: {message!s}")
+        log.debug(f"Add to queue: {message!s}")
         self._wait.append(message) 
 
   async def start_consume(self, **kwargs):
@@ -197,8 +201,6 @@ class FutureQueue(BasicQueue):
         self._wait.remove(message)
         return future.result()
 
-    #if future._match_dict != {'service':'counter'}:
-    #  self._receive.append(future)
     self._receive.append(future)
 
     # Remove a MessageFuture from the list when it is done
