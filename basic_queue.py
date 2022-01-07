@@ -28,7 +28,7 @@ class QueueMessage:
 
   async def ack(self):
     """
-    TODO
+    TODO consider auto_ack
     :raises: ?
     """
     log.debug("Ack message: %s", self.delivery_tag)
@@ -115,7 +115,6 @@ class BasicQueue:
 
     if 'timeout' not in kwargs:
       kwargs['timeout'] = self.QUEUE_DECLARE_TIMEOUT
-
 
     result = await self._ch.queue_declare(queue=self._queue, **kwargs)
     self._name = result.queue

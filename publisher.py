@@ -72,6 +72,9 @@ class DirectPublisher(BasicPublisher):
   QUEUE_DECLARE_TIMEOUT = 1
 
   def __init__(self, ch, dest, reply_to=None):
+    """
+    :param dest: name of the destination queue (str)
+    """
     self._ch = ch
     self._dest = dest
     self.reply_to = reply_to

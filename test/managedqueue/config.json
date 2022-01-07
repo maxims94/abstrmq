@@ -15,19 +15,11 @@
     }
   },
   "loggers": {
-    "st_base": {
+    "main": {
        "level": "DEBUG",
        "handlers": ["default"]
     },
     "abstrmq": {
-       "level": "DEBUG",
-       "handlers": ["default"]
-    },
-    "aiormq": {
-       "level": "DEBUG",
-       "handlers": ["default"]
-    },
-    "asyncio": {
        "level": "DEBUG",
        "handlers": ["default"]
     }

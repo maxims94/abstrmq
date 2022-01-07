@@ -1,6 +1,7 @@
 from .basic_queue import BasicQueue
 from .future_queue import FutureQueue, FutureQueueMode, MessageFuture
 from .future_queue_session import FutureQueueSession
+from .managed_queue import ManagedQueue
 from .publisher import BasicPublisher, DirectPublisher, ExchangePublisher, HeadersExchangePublisher
 from .basic_exchange import BasicExchange, HeadersExchange
 from .rmqclient import RMQClient

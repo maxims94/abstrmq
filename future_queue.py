@@ -12,23 +12,20 @@ class MessageFuture(asyncio.Future):
   A Future that represents criteria for a message
 
   It will be set once a message is passed to it that satisfies the criteria
+
+  :param custom: a callable that takes a message and returns True or False
   """
   # TODO: match any / all
 
-  def __init__(self, match = {}, headers = {}, corr_id=None, *args, **kwargs):
+  def __init__(self, match = {}, headers = {}, corr_id=None, custom=None, *args, **kwargs):
     super().__init__(*args, **kwargs)
     self._match_dict = match
     self._headers_dict = headers
     self._corr_id = corr_id
+    self._custom = custom
     self._result_value = None
 
-  def process(self, msg : QueueMessage):
-    if self.done():
-      return False
-
-    assert not self.cancelled(), "Can't pass a message to a cancelled MessageFuture"
-    assert not self.done(), f"Tried to process {msg} on a MessageFuture that is already set to {self._result_value}"
-
+  def is_match(self, msg : QueueMessage):
     if self._match_dict:
       if not msg.match_dict(self._match_dict):
         return False
@@ -41,9 +38,25 @@ class MessageFuture(asyncio.Future):
       if msg.corr_id != self._corr_id:
         return False
 
-    self.set_result(msg)
-    self._result_value = msg
+    if self._custom:
+      if not self._custom(msg):
+        return False
+
     return True
+
+  def process(self, msg : QueueMessage):
+    if self.done():
+      return False
+
+    assert not self.cancelled(), "Can't pass a message to a cancelled MessageFuture"
+    assert not self.done(), f"Tried to process {msg} on a MessageFuture that is already set to {self._result_value}"
+    
+    if self.is_match(msg):
+      self.set_result(msg)
+      self._result_value = msg
+      return True
+    else:
+      return False
 
   def cancel(self, *args, **kwargs):
     #log.debug(f"Cancel {self!r}")
@@ -61,13 +74,25 @@ class FutureQueueMode(Enum):
 
   DROP: drop unmatched messages
   STRICT: raise an error if a message can't be matched
-  WAIT: wait (indefinitely) until a matching Future has been passed via receive (this is NOT safe as it might lead to a buffer overflow!)
+  WAIT: wait (indefinitely) until a matching Future has been passed via receive; if the buffer is full, messages will be dropped
   CIRCULAR: Like WAIT, only that old messages are dropped if the buffer is full and they haven't been used (buffer overflow safe!)
   """
   DROP = 'drop'
   STRICT = 'strict'
   WAIT = 'wait'
   CIRCULAR = 'circular'
+
+class FutureQueueDropReason(Enum):
+  """
+  Represents the reason why a message was dropped. Passed to on_drop callback
+
+  NO_FUTURE_FOUND: If a matching Future has not been found (for DROP)
+  BUFFER_FULL: If the buffer is full (WAIT, CIRCULAR)
+  NOT_REGISTERED: The message has not been registered (used by ManagedQueue)
+  """
+  NO_FUTURE_FOUND = 'no_future_found'
+  FULL_BUFFER = 'full_buffer'
+  NOT_REGISTERED = 'not_registered'
 
 class FutureQueueException(Exception):
   pass
@@ -79,23 +104,18 @@ class FutureQueue(BasicQueue):
   """
 
   :param mode: Specifies behavior for unexpected messages, either a FutureQueueMode or a function that takes the unexpected message and returns a FutureQueueMode
+  :param on_drop: a callable of the form func(msg: QueueMessage, reason: FutureQueueDropReason). It is called every time a message is dropped in the DROP, WAIT and CIRCULAR modes
   """
   
-  # Dev: make this very small to notice failures quickly
-  WAIT_QUEUE_SIZE = 5
-
-  def __init__(self, *args, mode : FutureQueueMode = FutureQueueMode.DROP, **kwargs):
+  def __init__(self, *args, mode : FutureQueueMode = FutureQueueMode.DROP, on_drop = None, buffer_size = 5, **kwargs):
     super().__init__(*args, **kwargs)
     self._receive = []
     self._wait = []
     self._mode = mode
+    self._on_drop = on_drop or (lambda msg, reason: None)
+    self._buffer_size = buffer_size
 
   async def _process_message(self, message):
-
-    #def print_error(fut):
-    #  if fut.done() and fut.exception():
-    #    log.error(f"Error in _process_message: {fut.exception()}")
-    #asyncio.current_task().add_done_callback(print_error)
 
     log.debug(f"Process message {message!r}")
     
@@ -124,20 +144,28 @@ class FutureQueue(BasicQueue):
 
       if selected_mode is FutureQueueMode.STRICT:
         raise FutureQueueException("Couldn't find a matching future for a message")
+
       if selected_mode is FutureQueueMode.WAIT:
-        assert len(self._wait) < self.WAIT_QUEUE_SIZE, "Message buffer full"
-        log.debug(f"Add to queue: {message!s}")
-        self._wait.append(message) 
+        if len(self._wait) < self._buffer_size:
+          log.debug(f"Add to queue: {message!s}")
+          self._wait.append(message) 
+        else:
+          log.warning("Message buffer full: Drop message")
+          self._on_drop(message, FutureQueueDropReason.FULL_BUFFER)
+
       if selected_mode is FutureQueueMode.DROP:
         log.warning(f"Drop message: {message!s}")
+        self._on_drop(message, FutureQueueDropReason.NO_FUTURE_FOUND)
+
       if selected_mode is FutureQueueMode.CIRCULAR:
         # At no point are two messages added, so == is enough
-        if len(self._wait) == self.WAIT_QUEUE_SIZE:
+        if len(self._wait) == self._buffer_size:
           old_message = self._wait.pop(0)
           log.warning(f"Dropped old message: {old_message!s}")
+          self._on_drop(old_message, FutureQueueDropReason.FULL_BUFFER)
 
-          # Sanity check (could happen if you have multiple threads)
-          assert len(self._wait) < self.WAIT_QUEUE_SIZE
+          # Sanity check (could fail if you have multiple threads)
+          assert len(self._wait) < self._buffer_size
 
         log.debug(f"Add to queue: {message!s}")
         self._wait.append(message) 
