@@ -42,23 +42,43 @@ class InteractiveSessionBase(FutureQueueSession):
     """
     assert self.state.is_in(InteractiveSessionState.RUNNING)
     await self.publish(*args, **kwargs)
-
-  async def receive_message(self, *args, **kwargs):
+  
+  async def _receive_loop(self):
     """
-    In running state, receive a message from the other host
-
-    :raises: InteractiveSessionClosed in case the other host ended the session
+    Advantages:
+    * low complexity
+    * all internal messages are processed in one place
+    * immediately covers all messages with the respective corr_id (for ManagedQueue)
     """
-    assert self.state.is_in(InteractiveSessionState.RUNNING)
-    
-    custom = lambda msg: '_session' not in msg.content
-    if 'custom' in kwargs:
-      custom = lambda msg: custom(msg) and kwargs['custom']
-    kwargs['custom'] = custom
 
-    self._receive_task = self._mgr.create_task(self.receive(*args, **kwargs))
+    assert self.state.is_in(InteractiveSessionState.RUNNING, InteractiveSessionState.CLOSED)
 
-    return (await self._receive_task)
+    if self.state.is_in(InteractiveSessionState.CLOSED):
+      return
+
+    while True:
+      try:
+        msg = await self.receive()
+      except asyncio.CancelledError:
+        log.debug("Cancel receive loop")
+        break
+
+      if '_session' in msg.content:
+        if msg.content == {'_session': 'close'}:
+          log.debug("Close received")
+          await self.state.set(InteractiveSessionState.CLOSED)
+          break
+        else:
+          # Ignore invalid message
+          log.debug(f"Invalid internal message: {msg.content}")
+      else:
+        await self.process_message(msg)
+
+  async def process_message(self, msg):
+    """
+    Callback function for payload messages
+    """
+    pass
 
   async def publish_close(self):
     """
@@ -73,24 +93,6 @@ class InteractiveSessionBase(FutureQueueSession):
 
     with suppress(asyncio.TimeoutError):
       await self.publish({'_session': 'close'})
-
-  async def receive_close(self):
-    """
-    Listen to the other node closing
-    """
-    assert self.state.is_in(InteractiveSessionState.RUNNING, InteractiveSessionState.CLOSED)
-
-    if self.state.is_in(InteractiveSessionState.CLOSED):
-      return
-    
-    try:
-      await self.receive({'_session': 'close'})
-    except asyncio.CancelledError:
-      return
-    else:
-      log.debug("Close received")
-      self._receive_task.cancel()
-      await self.state.set(InteractiveSessionState.CLOSED)
 
   def started(self):
     return self.state.wait_for(InteractiveSessionState.RUNNING, InteractiveSessionState.CLOSED)
@@ -151,7 +153,7 @@ class InteractiveClientSession(InteractiveSessionBase):
     if state == 'start_success':
       self.publisher = DirectPublisher(msg.ch, msg.reply_to, reply_to=self.queue.name)
       await self.state.set(InteractiveSessionState.RUNNING)
-      self._mgr.create_task(self.receive_close())
+      self._mgr.create_task(self._receive_loop())
 
     elif state == 'start_failure':
       await self.state.set(InteractiveSessionState.CLOSED)
@@ -196,6 +198,6 @@ class InteractiveServerSession(InteractiveSessionBase):
 
     await self.publish({'_session': 'start_success'})
     await self.state.set(InteractiveSessionState.RUNNING)
-    self._mgr.create_task(self.receive_close())
+    self._mgr.create_task(self._receive_loop())
 
     return msg

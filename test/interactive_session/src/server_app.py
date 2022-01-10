@@ -51,6 +51,10 @@ class BasicSession(InteractiveServerSession):
 
     await self.publish_close()
 
+  async def process_message(self, msg):
+    log.warning(f"Unexpected message to server: {msg}")
+    pass
+
 class ServerApp(RMQApp):
   def __init__(self):
     super().__init__()
