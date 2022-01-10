@@ -17,10 +17,11 @@ class MessageFuture(asyncio.Future):
   """
   # TODO: match any / all
 
-  def __init__(self, match = {}, headers = {}, corr_id=None, custom=None, *args, **kwargs):
+  def __init__(self, match = {}, headers = {}, headers_eq = {}, corr_id=None, custom=None, *args, **kwargs):
     super().__init__(*args, **kwargs)
     self._match_dict = match
     self._headers_dict = headers
+    self._headers_eq_dict = headers_eq
     self._corr_id = corr_id
     self._custom = custom
     self._result_value = None
@@ -32,6 +33,10 @@ class MessageFuture(asyncio.Future):
 
     if self._headers_dict:
       if not msg.match_headers_dict(self._headers_dict):
+        return False
+
+    if self._headers_eq_dict:
+      if msg.headers != self._headers_eq_dict:
         return False
 
     if self._corr_id:
@@ -98,9 +103,7 @@ class FutureQueueException(Exception):
   pass
 
 class FutureQueue(BasicQueue):
-  # TODO: wait; ensure that the task is interrupted after receive timeout
-
-  # TODO: make sure that there is no buffer overflow; timeout for messages? function to drop all waiting messages? better "mode"?
+  # TODO: use Queue instead of linked list
   """
 
   :param mode: Specifies behavior for unexpected messages, either a FutureQueueMode or a function that takes the unexpected message and returns a FutureQueueMode

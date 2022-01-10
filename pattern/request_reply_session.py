@@ -3,12 +3,14 @@ from ..future_queue import FutureQueue
 from ..publisher import BasicPublisher, DirectPublisher
 
 """
-General pattern:
-A client makes a single request to a server
+Protocol:
+
+A client makes a request to a server
 It provides a reply queue and a correlation ID
 The server receives the request
 It processes the request and generates a reply
-Then sends a reply back to the client
+Then, it sends a reply back to the client
+This ends the session on both sides
 """
 
 class RequestReplyClientSession(FutureQueueSession):

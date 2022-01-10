@@ -1,1 +1,2 @@
 from .request_reply_session import RequestReplyClientSession, RequestReplyServerSession
+from .interactive_session import InteractiveSession
