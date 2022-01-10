@@ -179,6 +179,7 @@ class FutureQueue(BasicQueue):
   def receive_future(self, *args, timeout=None, **kwargs):
     """
     Works like receive, but returns a future
+    TODO: Not tested
     """
 
     future = MessageFuture(*args, **kwargs)
@@ -199,14 +200,8 @@ class FutureQueue(BasicQueue):
     # Ensures that a cancelled future is removed
     # This can happen if the user decides they no longer need a message
     def on_done(fut):
-      try:
-        if fut.cancelled():
-          pass
-          #log.debug(f"on_done:MessageFuture cancelled: {fut!r}")
-      except Exception as ex:
-        # Send to global default exception handler
-        raise ex
-        #log.exception(ex)
+      if fut.cancelled():
+        log.debug(f"on_done:MessageFuture cancelled: {fut!r}")
       self._receive.remove(fut)
 
     future.add_done_callback(on_done)
@@ -241,8 +236,6 @@ class FutureQueue(BasicQueue):
     def on_done(fut):
       if fut.cancelled():
         log.debug(f"on_done:MessageFuture cancelled: {fut!r}")
-      #if future._match_dict != {'service':'counter'}:
-      #  self._receive.remove(fut)
       self._receive.remove(fut)
 
     future.add_done_callback(on_done)

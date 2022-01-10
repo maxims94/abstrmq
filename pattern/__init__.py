@@ -1,2 +1,2 @@
 from .request_reply_session import RequestReplyClientSession, RequestReplyServerSession
-from .interactive_session import InteractiveClientSession, InteractiveServerSession, InteractiveSessionError, InteractiveSessionClosed
+from .interactive_session import InteractiveClientSession, InteractiveServerSession, InteractiveSessionError

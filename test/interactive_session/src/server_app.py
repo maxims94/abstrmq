@@ -11,8 +11,6 @@ class BasicSession(InteractiveServerSession):
 
   async def run(self):
 
-    self._mgr = TaskManager()
-
     def validate(msg):
       msg.assert_has_keys('from', 'to', 'sleep')
       if msg.get('from') >= msg.get('to'):
@@ -21,10 +19,10 @@ class BasicSession(InteractiveServerSession):
     msg = await self.receive_start({'command': 'count'}, validator=validate)
 
     if not msg:
-      log.info("Session did not start")
+      log.info("Failed to start session")
       return
 
-    log.info("Session starts")
+    log.info(f"New session: {msg.content}")
 
     self._from = msg.get('from')
     self._to = msg.get('to')
@@ -34,14 +32,17 @@ class BasicSession(InteractiveServerSession):
 
     try:
       await self.closed()
-    except:
-      pass
+    except asyncio.CancelledError:
+      log.debug("Cancelled session")
+      with suppress(asyncio.TimeoutError):
+        await self.publish_close()
     finally:
       await self._mgr.close()
 
   async def interval_counter(self):
     i = self._from
     while i <= self._to:
+      log.info(f"Publish: {i}")
       with suppress(asyncio.TimeoutError):
         await self.publish_message({'current': i})
 
@@ -71,8 +72,9 @@ class ServerApp(RMQApp):
     try:
       await asyncio.Future()
     except asyncio.CancelledError:
-      log.debug("Cancelled")
+      log.debug("Cancelled app")
     finally:
+      await self._session.close()
       await self._mgr.close()
 
   async def session_loop(self):

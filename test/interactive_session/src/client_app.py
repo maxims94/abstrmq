@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import random
 from abstrmq import *
 from abstrmq.rmqnode import *
 from abstrmq.pattern import *
@@ -20,18 +21,25 @@ class ClientApp(RMQApp):
     await self._queue.declare()
     await self._queue.start_consume()
 
+    self._session = InteractiveClientSession(self._queue)
+    self._mgr.create_task(self._run_session())
+
     try:
-      await self._session()
+      await self._session.closed()
     except asyncio.CancelledError:
       log.debug("Cancelled")
+      with suppress(asyncio.TimeoutError):
+        await self._session.publish_close()
     finally:
       await self._mgr.close()
+      self._session.close()
 
-  async def _session(self):
+  async def _run_session(self):
 
-    session = InteractiveClientSession(self._queue)
     try:
-      await session.publish_start({'command': 'count', 'from': 1, 'to': 10, 'sleep': 0.5}, publisher=DirectPublisher(self._ch, 'interactive_session_test'))
+      config = {'command': 'count', 'from': 1, 'to': random.randint(2,10), 'sleep': random.random()*2}
+      log.info(f"Config: {config}")
+      await self._session.publish_start(config, publisher=DirectPublisher(self._ch, 'interactive_session_test'))
     except asyncio.TimeoutError as ex:
       log.error("Timeout")
       return
@@ -44,14 +52,9 @@ class ClientApp(RMQApp):
 
     while True:
       try:
-        msg = await session.receive_message()
-      except InteractiveSessionClosed as ex:
-        log.info("Session closed")
-        return
+        msg = await self._session.receive_message()
       except asyncio.CancelledError:
-        log.info("Cancelled")
-        with suppress(asyncio.TimeoutError):
-          await session.publish_close()
+        log.info("receive_message cancelled")
         return
 
       log.info(f"Received: {msg.content}")

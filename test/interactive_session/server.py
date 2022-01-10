@@ -6,6 +6,7 @@ from abstrmq.rmqnode import RMQNode
 from src.server_app import ServerApp
 
 log_config_path = f'config.json'
+#log_config_path = f'config_prod.json'
 with open(log_config_path) as f:
     logging.config.dictConfig(json.load(f))
 
