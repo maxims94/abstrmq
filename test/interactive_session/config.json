@@ -15,6 +15,10 @@
     }
   },
   "loggers": {
+    "src": {
+       "level": "DEBUG",
+       "handlers": ["default"]
+    },
     "main": {
        "level": "DEBUG",
        "handlers": ["default"]

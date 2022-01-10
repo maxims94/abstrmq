@@ -98,6 +98,7 @@ class RequestReplyServerSession(FutureQueueSession):
 
     msg.assert_reply_to()
     msg.assert_corr_id()
+    # TODO: raise RemoteError yourself when validator returns False?
     if validator:
       validator(msg)
 

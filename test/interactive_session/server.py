@@ -3,7 +3,7 @@ import logging.config
 import json
 
 from abstrmq.rmqnode import RMQNode
-from src.client_app import ServerApp
+from src.server_app import ServerApp
 
 log_config_path = f'config.json'
 with open(log_config_path) as f:
