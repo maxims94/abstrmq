@@ -77,6 +77,8 @@ class FutureQueueSession:
   def close(self):
     """
     This only prevents the start of new communication, not stop currently running communication (this should be handled by the subclass)
+
+    Note that if you use SessionManager, this is invoked automatically after `run` is done! No need to do it manually!
     """
 
     assert self._open
