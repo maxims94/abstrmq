@@ -173,13 +173,6 @@ class InteractiveServerSession(InteractiveSessionBase):
     """
     pass
 
-  def validate_request(self, msg):
-    """
-    Expected to throw an Exception if invalid. This is not necessarily a RemoteError (indicating a malformed request). It may be, for example, that the session has to be refused due to server overload
-
-    """
-    pass
-  
   async def receive_start(self, *args, validator=None, **kwargs):
     """
     Wait for the client to initiate a new session.
