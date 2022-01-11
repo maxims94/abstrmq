@@ -1,3 +1,4 @@
+import asyncio
 from ..future_queue_session import FutureQueueSession
 from ..future_queue import FutureQueue
 from ..publisher import BasicPublisher, DirectPublisher
@@ -84,6 +85,7 @@ class RequestReplyServerSession(FutureQueueSession):
 
   def __init__(self, request_queue: FutureQueue):
     super().__init__(request_queue)
+    self._started = asyncio.Event()
 
   async def receive_request(self, *args, validator=None, **kwargs):
     """
@@ -103,10 +105,10 @@ class RequestReplyServerSession(FutureQueueSession):
     msg.assert_reply_to()
     msg.assert_corr_id()
 
+    self.publisher = DirectPublisher(msg.ch, msg.reply_to)
+
     if validator:
       validator(msg)
-
-    self.publisher = DirectPublisher(msg.ch, msg.reply_to)
 
     return msg
 
@@ -118,3 +120,6 @@ class RequestReplyServerSession(FutureQueueSession):
     """
 
     await self.publish(*args, **kwargs)
+
+  async def started(self):
+    await self._started.wait()
