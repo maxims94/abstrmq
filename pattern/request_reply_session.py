@@ -1,6 +1,7 @@
 from ..future_queue_session import FutureQueueSession
 from ..future_queue import FutureQueue
 from ..publisher import BasicPublisher, DirectPublisher
+from ..exceptions import InvalidMessageError
 
 """
 Protocol:
@@ -84,21 +85,24 @@ class RequestReplyServerSession(FutureQueueSession):
   def __init__(self, request_queue: FutureQueue):
     super().__init__(request_queue)
 
-  async def receive_request(self, validator=None, *args, **kwargs):
+  async def receive_request(self, *args, validator=None, **kwargs):
     """
     Wait for a request from the client.
 
-    Validate the request. If it fails, a RemoteError is thrown (this is the behavior expected from the custom validator)
+    Then, validate the request. If it fails, a RemoteError is thrown.
     
     If it is valid, return the request. It is expected that the server will process it now.
 
     :rtype: QueueMessage
+    :param validator: a callable that checks whether a request has the right format. If not, it is expected to raise a RemoteError
+
+    :raises: RemoteError
     """
     msg = await self.receive(*args, **kwargs)
 
     msg.assert_reply_to()
     msg.assert_corr_id()
-    # TODO: raise RemoteError yourself when validator returns False?
+
     if validator:
       validator(msg)
 

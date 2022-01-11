@@ -9,14 +9,18 @@ log = logging.getLogger(__name__)
 
 class BasicSession(InteractiveServerSession):
 
+  def process_request(self, msg):
+    log.debug("Process message")
+
   async def run(self):
 
-    def validate(msg):
+    def validator(msg):
+      log.debug("Validate request")
       msg.assert_has_keys('from', 'to', 'sleep')
       if msg.get('from') >= msg.get('to'):
         raise InvalidMessageError("Constraint violated: from < to")
 
-    msg = await self.receive_start({'command': 'count'}, validator=validate)
+    msg = await self.receive_start({'command': 'count'}, validator=validator)
 
     if not msg:
       log.info("Failed to start session")

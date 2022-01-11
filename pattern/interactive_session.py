@@ -164,12 +164,27 @@ class InteractiveClientSession(InteractiveSessionBase):
 #
 
 class InteractiveServerSession(InteractiveSessionBase):
+
+  def process_request(self, msg):
+    """
+    Process the request, e.g. extracting attributes
+
+    Expected to throw an exception if the message is invalid / it was failed to be processed
+    """
+    pass
+
+  def validate_request(self, msg):
+    """
+    Expected to throw an Exception if invalid. This is not necessarily a RemoteError (indicating a malformed request). It may be, for example, that the session has to be refused due to server overload
+
+    """
+    pass
   
   async def receive_start(self, *args, validator=None, **kwargs):
     """
     Wait for the client to initiate a new session.
 
-    :param validator: expected to throw an Exception if invalid (not necessarily a RemoteError since it may have to refuse the session due to server overload)
+    :param validator: a callback that checks whether the request is valid. Takes one argument (the message). Expected to throw a RemoteError if the request is invalid.
     :raises: TimeoutError
     """
 
@@ -191,6 +206,13 @@ class InteractiveServerSession(InteractiveSessionBase):
     try:
       if validator:
         validator(msg)
+    except RemoteError as ex:
+      await self.publish({'_session': 'start_failure', '_message': str(ex)})
+      await self.state.set(InteractiveSessionState.CLOSED)
+      return False
+
+    try:
+      self.process_request(msg)
     except Exception as ex:
       await self.publish({'_session': 'start_failure', '_message': str(ex)})
       await self.state.set(InteractiveSessionState.CLOSED)
