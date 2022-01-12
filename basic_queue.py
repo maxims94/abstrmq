@@ -52,9 +52,21 @@ class QueueMessage:
     return True
 
   def assert_has_keys(self, *keys):
+    self.assert_is_dict()
     missing = set(keys) - self.content.keys()
     if missing:
       raise InvalidMessageError(f"Missing keys: {', '.join(missing)}")
+    return True
+
+  def assert_exact_keys(self, *keys):
+    self.assert_is_dict()
+    if set(keys) != self.content.keys():
+      raise InvalidMessageError(f"Wrong keys. Need: {', '.join(keys)}")
+    return True
+
+  def assert_is_dict(self):
+    if not isinstance(self.content, dict):
+      raise InvalidMessageError("Must be dict")
     return True
 
   def assert_message(self, callable, msg='Invalid message'):

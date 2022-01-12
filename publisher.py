@@ -30,7 +30,7 @@ class BasicPublisher:
     :param timeout:
     """
 
-    log.debug('Publish message: %s', str(message))
+    log.info('Publish message: %s', str(message))
 
     body = json.dumps(message).encode()
 

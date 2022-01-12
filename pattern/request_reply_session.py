@@ -102,6 +102,8 @@ class RequestReplyServerSession(FutureQueueSession):
     """
     msg = await self.receive(*args, **kwargs)
 
+    self._started.set()
+
     msg.assert_reply_to()
     msg.assert_corr_id()
 

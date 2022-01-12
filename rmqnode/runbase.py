@@ -25,7 +25,7 @@ class RunBase:
   def start(self):
     #asyncio.run(self._wrapper())
     asyncio.run(self._wrapper(), debug=True)
-    log.debug("Loop closed")
+    log.debug("Event loop closed")
     if self.on_done:
       self.on_done()
 
