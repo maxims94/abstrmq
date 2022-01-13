@@ -14,6 +14,7 @@ class BasicPublisher:
   """
 
   PUBLISH_TIMEOUT = 1
+  MAX_LOG_LEN = 500
 
   def __init__(self, ch):
     self._ch = ch
@@ -30,7 +31,10 @@ class BasicPublisher:
     :param timeout:
     """
 
-    log.info('Publish message: %s', str(message))
+    msg_str = str(message)
+    if len(msg_str) > self.MAX_LOG_LEN:
+      msg_str = msg_str[:self.MAX_LOG_LEN-3]+"..."
+    log.info('Publish message: %s', msg_str)
 
     body = json.dumps(message).encode()
 
