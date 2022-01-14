@@ -21,20 +21,20 @@ class FutureQueueSession:
     self._open = True
     self.on_close = None
     self.log = None
-    self._register_future = None
 
-  def _set_corr_id(self, corr_id):
+  def set_corr_id(self, corr_id=None):
     """
     Can only be called once; the corr_id of a session can't change
 
-    Guarantees that the session is registered once a corr_id is available
+    This CAN be called by the user if they need the corr_id early. It only makes sense for clients.
     """
-    assert not self.corr_id
+    assert self.corr_id is None
+
+    if corr_id is None:
+      corr_id = str(uuid.uuid4())
+
     log.debug("Set corr_id to %s", corr_id)
     self.corr_id = corr_id
-
-  def _generate_corr_id(self):
-    return str(uuid.uuid4())
 
   def short_id(self):
     if self.corr_id:
@@ -55,15 +55,14 @@ class FutureQueueSession:
     except:
       raise
     else:
-      if self.corr_id is None:
-        if result.corr_id is not None:
-          self.corr_id = result.corr_id
+      if result.corr_id is not None:
+        if self.corr_id is None:
+          self.set_corr_id(result.corr_id)
         else:
-          log.warning("Session received message without corr_id")
-      else:
-        if result.corr_id is not None:
           if self.corr_id != result.corr_id:
             log.warning("Received message with wrong corr_id")
+      else:
+        log.warning("Received message without corr_id")
             
       return result
 
@@ -72,10 +71,7 @@ class FutureQueueSession:
     assert self.publisher
 
     if self.corr_id is None:
-      self.generate_corr_id()
-
-      if isinstance(self.queue, ManagedQueue):
-        self._register_future = self.queue.register(corr_id = self.corr_id)
+      self.set_corr_id()
 
     return await self.publisher.publish(*args, corr_id = self.corr_id, **kwargs)
 
@@ -89,10 +85,6 @@ class FutureQueueSession:
     assert self._open
 
     log.debug("Close session: %s", self.corr_id)
-
-    if isinstance(self.queue, ManagedQueue) and self._register_future:
-      self.queue.deregister(self._register_future)
-      self._register_future = None
 
     # TODO: on_close can be a coro
     # TODO: remove callback?
@@ -135,14 +127,15 @@ class FutureQueueSession:
     return f"<FutureQueueSession corr_id={self.corr_id}>"
 
   #
-  # Remark on ManagedQueues: We don't know that a certain session will really handle *all* of messages for this corr_id, but we give helper methods for the case that it does!
+  # Remark on ManagedQueues: We can't register a session on all messages with a certain corr_id since we don't know whether it will really handle all of them
+  # But we can provide helper methods!
   #
 
-  def register(self):
+  def register(self, *args, **kwargs):
     assert isinstance(self.queue, ManagedQueue)
-    self._register_future = self.queue.register(corr_id = self.corr_id)
+    assert self.corr_id is not None
+    return self.queue.register(corr_id = self.corr_id, *args, **kwargs)
 
-  def deregister(self):
+  def deregister(self, fut):
     assert isinstance(self.queue, ManagedQueue)
-    assert self._register_future
-    self.queue.deregister(self._register_future)
+    self.queue.deregister(fut)

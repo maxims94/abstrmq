@@ -27,5 +27,5 @@ class ManagedQueue(FutureQueue):
     if any(fut.is_match(message) for fut in self._register):
       await super()._process_message(message)
     else:
-      log.debug(f"Unregistered message found: {message.short_str()} (reason: {reason.value})")
+      log.debug(f"Unregistered message found: {message.short_str()}")
       self._on_drop(message, FutureQueueDropReason.NOT_REGISTERED)
