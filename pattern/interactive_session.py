@@ -43,7 +43,7 @@ class InteractiveSessionBase(FutureQueueSession):
     assert self.state.is_in(InteractiveSessionState.RUNNING)
     await self.publish(*args, **kwargs)
   
-  async def _receive_loop(self):
+  async def _base_recv_loop(self):
     """
     Advantages:
     * low complexity
@@ -153,7 +153,7 @@ class InteractiveClientSession(InteractiveSessionBase):
     if state == 'start_success':
       self.publisher = DirectPublisher(msg.ch, msg.reply_to, reply_to=self.queue.name)
       await self.state.set(InteractiveSessionState.RUNNING)
-      self._mgr.create_task(self._receive_loop())
+      self._mgr.create_task(self._base_recv_loop())
 
     elif state == 'start_failure':
       await self.state.set(InteractiveSessionState.CLOSED)
@@ -201,7 +201,7 @@ class InteractiveServerSession(InteractiveSessionBase):
 
     await self.publish({'_session': 'start_success'})
     await self.state.set(InteractiveSessionState.RUNNING)
-    self._mgr.create_task(self._receive_loop())
+    self._mgr.create_task(self._base_recv_loop())
 
   async def publish_failure(self, msg):
 
