@@ -17,6 +17,8 @@ log = logging.getLogger(__name__)
 Full-duplex communication between client and server
 """
 
+# TODO: Use `mandatory` to identify unavailable remote nodes
+
 class InteractiveSessionError(Exception):
   pass
 
@@ -67,7 +69,8 @@ class InteractiveSessionBase(FutureQueueSession):
       if '_session' in msg.content:
         if msg.content == {'_session': 'close'}:
           log.debug("Close received")
-          await self.state.set(InteractiveSessionState.CLOSED)
+          if not self.state.is_in(InteractiveSessionState.CLOSED):
+            await self.state.set(InteractiveSessionState.CLOSED)
           break
         else:
           # Ignore invalid message
@@ -123,7 +126,6 @@ class InteractiveClientSession(InteractiveSessionBase):
 
     assert self.state.is_in(InteractiveSessionState.INIT)
 
-    self.generate_corr_id()
     self.publisher = publisher
     publisher.reply_to = self.queue.name
 

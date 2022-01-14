@@ -23,15 +23,21 @@ class FutureQueueSession:
     self.log = None
     self._register_future = None
 
-  def generate_corr_id(self):
+  def _set_corr_id(self, corr_id):
     """
-    Generates an corr_id when requested
+    Can only be called once; the corr_id of a session can't change
 
-    Why not ensure_corr_id? Because his class may be used in a server; in this case, it is assigned a corr_id!
+    Guarantees that the session is registered once a corr_id is available
     """
     assert not self.corr_id
-    self.corr_id = str(uuid.uuid4())
-    log.debug("Generate corr_id: %s", self.corr_id)
+    log.debug("Set corr_id to %s", corr_id)
+    self.corr_id = corr_id
+
+    if isinstance(self.queue, ManagedQueue):
+      self._register_future = self.queue.register(corr_id = self.corr_id)
+
+  def _generate_corr_id(self):
+    return str(uuid.uuid4())
 
   def short_id(self):
     if self.corr_id:
@@ -43,18 +49,21 @@ class FutureQueueSession:
     assert self._open
     assert self.queue
 
-    #def on_done(fut):
-    #  if fut.done() and fut.exception():
-    #    log.critical(fut.exception())
-    #asyncio.current_task().add_done_callback(on_done)
+    init_receive = self.corr_id is None
+    needs_register = isinstance(self.queue, ManagedQueue)
 
-    # Need to register a corr_id independent Future for the first message (if it's a server)
-    tmp_register = None
-    if self._register_future is None:
-      kwargs_fix = kwargs.copy()
-      if 'timeout' in kwargs:
-        del kwargs_fix['timeout']
-      tmp_register = self.queue.register(*args, **kwargs_fix)
+    # Need to register a corr_id independent Future for the first message
+    if needs_register:
+      tmp_register = None
+      if self._register_future is None:
+        kwargs_fix = kwargs.copy()
+        if 'timeout' in kwargs:
+          del kwargs_fix['timeout']
+        tmp_register = self.queue.register(*args, **kwargs_fix)
+
+    if not self.corr_id:
+      return (await self._receive_init(*args, **kwargs)
+
 
     try:
       # self.corr_id may be None
@@ -65,14 +74,11 @@ class FutureQueueSession:
     except:
       raise
     else:
-      # TODO: cleanup
+      log.debug(f'{self.corr_id}, {result.corr_id}')
       if self.corr_id is None:
         if result.corr_id is not None:
           self.corr_id = result.corr_id
-          log.debug("Set corr_id to %s", self.corr_id)
 
-          if isinstance(self.queue, ManagedQueue):
-            self._register_future = self.queue.register(corr_id = self.corr_id)
         else:
           log.warning("Session received message without corr_id")
 
@@ -81,8 +87,9 @@ class FutureQueueSession:
           assert self.corr_id == result.corr_id, "Received message with wrong corr_id"
       return result
     finally:
-      if tmp_register:
-        self.queue.deregister(tmp_register)
+      if isinstance(self.queue, ManagedQueue):
+        if tmp_register:
+          self.queue.deregister(tmp_register)
 
   async def publish(self, *args, **kwargs):
     assert self._open
