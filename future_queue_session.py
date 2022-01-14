@@ -33,9 +33,6 @@ class FutureQueueSession:
     log.debug("Set corr_id to %s", corr_id)
     self.corr_id = corr_id
 
-    if isinstance(self.queue, ManagedQueue):
-      self._register_future = self.queue.register(corr_id = self.corr_id)
-
   def _generate_corr_id(self):
     return str(uuid.uuid4())
 
@@ -49,22 +46,6 @@ class FutureQueueSession:
     assert self._open
     assert self.queue
 
-    init_receive = self.corr_id is None
-    needs_register = isinstance(self.queue, ManagedQueue)
-
-    # Need to register a corr_id independent Future for the first message
-    if needs_register:
-      tmp_register = None
-      if self._register_future is None:
-        kwargs_fix = kwargs.copy()
-        if 'timeout' in kwargs:
-          del kwargs_fix['timeout']
-        tmp_register = self.queue.register(*args, **kwargs_fix)
-
-    if not self.corr_id:
-      return (await self._receive_init(*args, **kwargs)
-
-
     try:
       # self.corr_id may be None
       result = await self.queue.receive(corr_id = self.corr_id, *args, **kwargs)
@@ -74,22 +55,17 @@ class FutureQueueSession:
     except:
       raise
     else:
-      log.debug(f'{self.corr_id}, {result.corr_id}')
       if self.corr_id is None:
         if result.corr_id is not None:
           self.corr_id = result.corr_id
-
         else:
           log.warning("Session received message without corr_id")
-
       else:
         if result.corr_id is not None:
-          assert self.corr_id == result.corr_id, "Received message with wrong corr_id"
+          if self.corr_id != result.corr_id:
+            log.warning("Received message with wrong corr_id")
+            
       return result
-    finally:
-      if isinstance(self.queue, ManagedQueue):
-        if tmp_register:
-          self.queue.deregister(tmp_register)
 
   async def publish(self, *args, **kwargs):
     assert self._open
@@ -157,3 +133,16 @@ class FutureQueueSession:
 
   def __repr__(self):
     return f"<FutureQueueSession corr_id={self.corr_id}>"
+
+  #
+  # Remark on ManagedQueues: We don't know that a certain session will really handle *all* of messages for this corr_id, but we give helper methods for the case that it does!
+  #
+
+  def register(self):
+    assert isinstance(self.queue, ManagedQueue)
+    self._register_future = self.queue.register(corr_id = self.corr_id)
+
+  def deregister(self):
+    assert isinstance(self.queue, ManagedQueue)
+    assert self._register_future
+    self.queue.deregister(self._register_future)
