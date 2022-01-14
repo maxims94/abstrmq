@@ -9,28 +9,29 @@ log = logging.getLogger(__name__)
 
 class BasicSession(InteractiveServerSession):
 
-  def process_request(self, msg):
-    log.debug("Process message")
-
   async def run(self):
 
-    def validator(msg):
-      log.debug("Validate request")
+    try:
+      msg = await self.receive_start({'command': 'count'})
+
       msg.assert_has_keys('from', 'to', 'sleep')
       if msg.get('from') >= msg.get('to'):
         raise InvalidMessageError("Constraint violated: from < to")
 
-    msg = await self.receive_start({'command': 'count'}, validator=validator)
+      self._from = msg.get('from')
+      self._to = msg.get('to')
+      self._sleep = msg.get('sleep')
 
-    if not msg:
-      log.info("Failed to start session")
+    except asyncio.CancelledError:
       return
+    except Exception as ex:
+      log.info("Failed to start session")
+      await self.publish_failure(str(ex))
+      return
+    
+    await self.publish_success()
 
     log.info(f"New session: {msg.content}")
-
-    self._from = msg.get('from')
-    self._to = msg.get('to')
-    self._sleep = msg.get('sleep')
 
     self._mgr.create_task(self.interval_counter())
 
@@ -87,5 +88,8 @@ class ServerApp(RMQApp):
 
   async def session_loop(self):
     while True:
-      s = await self._session.new_session(BasicSession(self._queue))
-      await s.started()
+      try:
+        s = await self._session.new_session(BasicSession(self._queue))
+        await s.started()
+      except asyncio.CancelledError:
+        break

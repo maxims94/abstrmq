@@ -164,21 +164,20 @@ class InteractiveClientSession(InteractiveSessionBase):
 #
 
 class InteractiveServerSession(InteractiveSessionBase):
+  """
+  Protocol:
 
-  def process_request(self, msg):
-    """
-    Process the request, e.g. extracting attributes
+  msg = receive_start()
+  [process message]
+  Then, you must either publish_success() or publish_failure() (and terminate the session)
+  """
 
-    Expected to throw an exception if the message is invalid / it was failed to be processed
-    """
-    pass
-
-  async def receive_start(self, *args, validator=None, **kwargs):
+  async def receive_start(self, *args, **kwargs):
     """
     Wait for the client to initiate a new session.
 
     :param validator: a callback that checks whether the request is valid. Takes one argument (the message). Expected to throw a RemoteError if the request is invalid.
-    :raises: TimeoutError
+    :raises: TimeoutError, RemoteError, any Exception from process_message
     """
 
     msg = await self.receive(*args, **kwargs)
@@ -192,27 +191,19 @@ class InteractiveServerSession(InteractiveSessionBase):
       # Unless we have reply_to and corr_id, we can't even send back an error message
       log.warning(repr(ex))
       await self.state.set(InteractiveSessionState.CLOSED)
-      return False
+      raise
 
     self.publisher = DirectPublisher(msg.ch, msg.reply_to, reply_to=self.queue.name)
-   
-    try:
-      if validator:
-        validator(msg)
-    except RemoteError as ex:
-      await self.publish({'_session': 'start_failure', '_message': str(ex)})
-      await self.state.set(InteractiveSessionState.CLOSED)
-      return False
 
-    try:
-      self.process_request(msg)
-    except Exception as ex:
-      await self.publish({'_session': 'start_failure', '_message': str(ex)})
-      await self.state.set(InteractiveSessionState.CLOSED)
-      return False
+    return msg
+
+  async def publish_success(self):
 
     await self.publish({'_session': 'start_success'})
     await self.state.set(InteractiveSessionState.RUNNING)
     self._mgr.create_task(self._receive_loop())
 
-    return msg
+  async def publish_failure(self, msg):
+
+    await self.publish({'_session': 'start_failure', '_message': msg})
+    await self.state.set(InteractiveSessionState.CLOSED)

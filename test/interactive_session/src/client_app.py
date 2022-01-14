@@ -8,12 +8,18 @@ from contextlib import suppress
 
 log = logging.getLogger(__name__)
 
+import os
+
 class ClientSession(InteractiveClientSession):
 
   async def run(self):
 
     try:
-      config = {'command': 'count', 'from': 1, 'to': random.randint(2,10), 'sleep': random.random()*2}
+      if not bool(os.environ.get('INVALID', 0)):
+        config = {'command': 'count', 'from': 1, 'to': random.randint(2,10), 'sleep': random.random()*2}
+      else:
+        config = {'command': 'count', 'invalid': 1}
+
       log.info(f"Config: {config}")
       await self.publish_start(config, publisher=DirectPublisher(self.queue._ch, 'interactive_session_test'))
     except asyncio.TimeoutError as ex:
