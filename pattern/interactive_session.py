@@ -95,8 +95,7 @@ class InteractiveSessionBase(FutureQueueSession):
 
     await self.state.set(InteractiveSessionState.CLOSED)
 
-    with suppress(asyncio.TimeoutError):
-      await self.publish({'_session': 'close'})
+    await self.publish({'_session': 'close'})
 
   def started(self):
     """
@@ -108,6 +107,12 @@ class InteractiveSessionBase(FutureQueueSession):
 
   def closed(self):
     return self.state.wait_for(InteractiveSessionState.CLOSED)
+
+  def is_started(self):
+    return self.state.is_in(InteractiveSessionState.RUNNING, InteractiveSessionState.CLOSED)
+
+  def is_closed(self):
+    return self.state.is_in(InteractiveSessionState.CLOSED)
 
 #
 # Client
