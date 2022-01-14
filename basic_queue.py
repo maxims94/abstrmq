@@ -36,6 +36,12 @@ class QueueMessage:
 
   def __str__(self):
     return str(self.content)
+
+  def short_str(self):
+    tmp = str(self)
+    if len(tmp) > 50:
+      tmp = tmp[:50-3] + "..."
+    return tmp
   
   def __repr__(self):
     return f"<QueueMessage: {self.delivery_tag}>"

@@ -3,6 +3,7 @@ import logging
 import asyncio
 
 from .future_queue import FutureQueue
+from .managed_queue import ManagedQueue
 from .publisher import BasicPublisher
 
 log = logging.getLogger(__name__)
@@ -20,6 +21,7 @@ class FutureQueueSession:
     self._open = True
     self.on_close = None
     self.log = None
+    self._register_future = None
 
   def generate_corr_id(self):
     """
@@ -46,6 +48,14 @@ class FutureQueueSession:
     #    log.critical(fut.exception())
     #asyncio.current_task().add_done_callback(on_done)
 
+    # Need to register a corr_id independent Future for the first message (if it's a server)
+    tmp_register = None
+    if self._register_future is None:
+      kwargs_fix = kwargs.copy()
+      if 'timeout' in kwargs:
+        del kwargs_fix['timeout']
+      tmp_register = self.queue.register(*args, **kwargs_fix)
+
     try:
       # self.corr_id may be None
       result = await self.queue.receive(corr_id = self.corr_id, *args, **kwargs)
@@ -55,23 +65,35 @@ class FutureQueueSession:
     except:
       raise
     else:
+      # TODO: cleanup
       if self.corr_id is None:
         if result.corr_id is not None:
           self.corr_id = result.corr_id
           log.debug("Set corr_id to %s", self.corr_id)
+
+          if isinstance(self.queue, ManagedQueue):
+            self._register_future = self.queue.register(corr_id = self.corr_id)
         else:
           log.warning("Session received message without corr_id")
+
       else:
         if result.corr_id is not None:
           assert self.corr_id == result.corr_id, "Received message with wrong corr_id"
       return result
+    finally:
+      if tmp_register:
+        self.queue.deregister(tmp_register)
 
   async def publish(self, *args, **kwargs):
     assert self._open
     assert self.publisher
 
-    if not self.corr_id:
+    if self.corr_id is None:
       self.generate_corr_id()
+
+      if isinstance(self.queue, ManagedQueue):
+        self._register_future = self.queue.register(corr_id = self.corr_id)
+
     return await self.publisher.publish(*args, corr_id = self.corr_id, **kwargs)
 
   def close(self):
@@ -84,6 +106,10 @@ class FutureQueueSession:
     assert self._open
 
     log.debug("Close session: %s", self.corr_id)
+
+    if isinstance(self.queue, ManagedQueue) and self._register_future:
+      self.queue.deregister(self._register_future)
+      self._register_future = None
 
     # TODO: on_close can be a coro
     # TODO: remove callback?

@@ -19,24 +19,24 @@ class MessageFuture(asyncio.Future):
 
   def __init__(self, match = {}, headers = {}, headers_eq = {}, corr_id=None, custom=None, *args, **kwargs):
     super().__init__(*args, **kwargs)
-    self._match_dict = match
-    self._headers_dict = headers
-    self._headers_eq_dict = headers_eq
+    self._match = match
+    self._headers = headers
+    self._headers_eq = headers_eq
     self._corr_id = corr_id
     self._custom = custom
     self._result_value = None
 
   def is_match(self, msg : QueueMessage):
-    if self._match_dict:
-      if not msg.match_dict(self._match_dict):
+    if self._match:
+      if not msg.match_dict(self._match):
         return False
 
-    if self._headers_dict:
-      if not msg.match_headers_dict(self._headers_dict):
+    if self._headers:
+      if not msg.match_headers_dict(self._headers):
         return False
 
-    if self._headers_eq_dict:
-      if msg.headers != self._headers_eq_dict:
+    if self._headers_eq:
+      if msg.headers != self._headers_eq:
         return False
 
     if self._corr_id:
@@ -68,7 +68,13 @@ class MessageFuture(asyncio.Future):
     return super().cancel(*args, **kwargs)
   
   def __str__(self):
-    return f"<{self._match_dict!r}, corr_id={self._corr_id}>"
+    tmp = {
+        'corr_id' : self._corr_id,
+        'headers_match' : self._headers,
+        'headers_eq': self._headers_eq
+    }
+    attr = [repr(self._match)] + [f"{k}={tmp[k]}" for k in sorted(tmp.keys()) if tmp[k]]
+    return f"<{', '.join(attr)}>"
   
   def __repr__(self):
     return str(self)

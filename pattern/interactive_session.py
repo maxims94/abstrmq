@@ -1,5 +1,6 @@
 from ..future_queue_session import FutureQueueSession
 from ..future_queue import FutureQueue
+from ..managed_queue import ManagedQueue
 from ..publisher import BasicPublisher, DirectPublisher
 from ..exceptions import RemoteError
 from ..state_condition import StateCondition
@@ -95,6 +96,11 @@ class InteractiveSessionBase(FutureQueueSession):
       await self.publish({'_session': 'close'})
 
   def started(self):
+    """
+    Usage:
+
+    await session.started()
+    """
     return self.state.wait_for(InteractiveSessionState.RUNNING, InteractiveSessionState.CLOSED)
 
   def closed(self):
@@ -108,7 +114,7 @@ class InteractiveClientSession(InteractiveSessionBase):
 
   START_REPLY_TIMEOUT = 2
 
-  async def publish_start(self, body, publisher: BasicPublisher):
+  async def publish_start(self, body, publisher: BasicPublisher, **kwargs):
     """
     Initiate a session by sending a request to the server. reply_to is added automatically
 
@@ -121,7 +127,7 @@ class InteractiveClientSession(InteractiveSessionBase):
     self.publisher = publisher
     publisher.reply_to = self.queue.name
 
-    await self.publish(body)
+    await self.publish(body, **kwargs)
 
     await self.state.set(InteractiveSessionState.START)
 
