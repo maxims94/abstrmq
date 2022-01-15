@@ -36,7 +36,7 @@ class RequestReplyClientSession(FutureQueueSession):
 
   def __init__(self, reply_queue: FutureQueue, publisher: BasicPublisher):
     super().__init__(reply_queue, publisher)
-    self.generate_corr_id()
+    self.set_corr_id()
     self.publisher.reply_to = self.queue.name
 
   async def publish_request(self, *args, **kwargs):

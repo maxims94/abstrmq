@@ -141,7 +141,7 @@ class InteractiveClientSession(InteractiveSessionBase):
 
   START_REPLY_TIMEOUT = 2
 
-  async def publish_start(self, body, publisher: BasicPublisher, **kwargs):
+  async def publish_start(self, body, publisher: BasicPublisher, timeout=None, **kwargs):
     """
     Initiate a session by sending a request to the server. reply_to is added automatically
 
@@ -149,6 +149,9 @@ class InteractiveClientSession(InteractiveSessionBase):
     """
 
     assert self.state.is_in(InteractiveSessionState.INIT)
+
+    if timeout is None:
+      timeout = START_REPLY_TIMEOUT
 
     self.publisher = publisher
     publisher.reply_to = self.queue.name
@@ -158,7 +161,7 @@ class InteractiveClientSession(InteractiveSessionBase):
     await self.state.set(InteractiveSessionState.START)
 
     try:
-      msg = await self.receive(timeout=self.START_REPLY_TIMEOUT)
+      msg = await self.receive(timeout=timeout)
     except asyncio.TimeoutError:
       await self.state.set(InteractiveSessionState.CLOSED)
       raise InteractiveSessionError("Timeout")

@@ -40,10 +40,12 @@ class QueueMessage:
   def __str__(self):
     return str(self.content)
 
-  def short_str(self):
+  def short_str(self, max_len=None):
     tmp = str(self)
-    if len(tmp) > self.MAX_SHORT_STR:
-      tmp = tmp[:self.MAX_SHORT_STR-3] + "..."
+    if max_len is None:
+      max_len = self.MAX_SHORT_STR
+    if len(tmp) > max_len:
+      tmp = tmp[:max_len-3] + "..."
     return tmp
   
   def __repr__(self):
@@ -176,6 +178,6 @@ class BasicQueue:
     # In case parsing the message fails, we still want to know that we received a message
     log.debug("Received message (delivery_tag: %s)", message.delivery.delivery_tag)
     qm = QueueMessage(message)
-    log.debug("Content: %s", qm.content)
+    log.debug("Content: %s", qm.short_str())
     log.debug(f"Properties: corr_id={qm.corr_id}, reply_to={qm.reply_to}, delivery_tag={qm.delivery_tag}, headers={qm.headers}")
     await self.on_message(qm)
