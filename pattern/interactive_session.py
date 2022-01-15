@@ -18,6 +18,8 @@ Full-duplex communication between client and server
 """
 
 # TODO: Use `mandatory` to identify unavailable remote nodes
+# TODO: Here, we *can* guarantee that it will consume all messages with a specific corr_id, due to the read loop -> include register / deregister for ManagedQueue
+# TODO: timeout for receiving messages from the server (subclasses can't define a timeout, they only react if a message arrives)
 
 class InteractiveSessionError(Exception):
   pass
@@ -36,6 +38,14 @@ class InteractiveSessionBase(FutureQueueSession):
     # Use this TaskManager instead of creating your own!
     self._mgr = TaskManager()
     self.state = StateCondition(InteractiveSessionState, InteractiveSessionState.INIT)
+    self._has_closed_session = False
+
+  @property
+  def has_closed_session(self):
+    """
+    Whether or not this node has initiated closing the session
+    """
+    return self._has_closed_session
 
   async def publish_message(self, *args, **kwargs):
     """
@@ -54,27 +64,31 @@ class InteractiveSessionBase(FutureQueueSession):
     * immediately covers all messages with the respective corr_id (for ManagedQueue)
     """
 
-    assert self.state.is_in(InteractiveSessionState.RUNNING, InteractiveSessionState.CLOSED)
-
-    if self.state.is_in(InteractiveSessionState.CLOSED):
-      return
+    assert self.is_started()
 
     while True:
+
+      if self.is_closed():
+        return
+
       try:
         msg = await self.receive()
       except asyncio.CancelledError:
         log.debug("Cancel receive loop")
         break
 
+      if self.is_closed():
+        log.warning(f"Dropped message due to closed session: ({msg.short_str()})")
+        return
+
       if '_session' in msg.content:
         if msg.content == {'_session': 'close'}:
           log.debug("Close received")
-          if not self.state.is_in(InteractiveSessionState.CLOSED):
-            await self.state.set(InteractiveSessionState.CLOSED)
+          await self.state.set(InteractiveSessionState.CLOSED)
           break
         else:
           # Ignore invalid message
-          log.debug(f"Invalid internal message: {msg.content}")
+          log.debug(f"Invalid internal message: {msg.short_str()}")
       else:
         await self.process_message(msg)
 
@@ -88,11 +102,16 @@ class InteractiveSessionBase(FutureQueueSession):
     """
     Node closes session and notifies the remote node
     """
-    assert self.state.is_in(InteractiveSessionState.RUNNING, InteractiveSessionState.CLOSED)
+    assert self.is_started()
 
-    if self.state.is_in(InteractiveSessionState.CLOSED):
+    if self.is_closed():
       return
 
+    # Do this first since this is used read by `finally`, which is invoked after setting state to CLOSED
+    self._has_closed_session = True
+
+    # Do this before publishing so that the receive loop will drop any messages received from now on
+    # This will typically also start the `finally` clause of `run`
     await self.state.set(InteractiveSessionState.CLOSED)
 
     await self.publish({'_session': 'close'})

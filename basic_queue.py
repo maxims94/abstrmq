@@ -12,6 +12,9 @@ from .exceptions import *
 from .basic_exchange import BasicExchange
 
 class QueueMessage:
+
+  MAX_SHORT_STR = 50
+
   def __init__(self, message:aiormq.abc.DeliveredMessage):
     """
     :raises: JSONDecodeError
@@ -39,8 +42,8 @@ class QueueMessage:
 
   def short_str(self):
     tmp = str(self)
-    if len(tmp) > 50:
-      tmp = tmp[:50-3] + "..."
+    if len(tmp) > self.MAX_SHORT_STR:
+      tmp = tmp[:self.MAX_SHORT_STR-3] + "..."
     return tmp
   
   def __repr__(self):
