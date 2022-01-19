@@ -20,6 +20,7 @@ Full-duplex communication between client and server
 # TODO: Use `mandatory` to identify unavailable remote nodes
 # TODO: Here, we *can* guarantee that it will consume all messages with a specific corr_id, due to the read loop -> include register / deregister for ManagedQueue
 # TODO: timeout for receiving messages from the server (subclasses can't define a timeout, they only react if a message arrives)
+# TODO: heartbeat; e.g. close the message if the other side hasn't responded in X seconds after a heartbeat request; reset timer on a new message; this must exist for BOTH client and server!! i.e. part of Base; this hsould be ENOUGH for both client and server to establish that the remote is available
 
 class InteractiveSessionError(Exception):
   pass
