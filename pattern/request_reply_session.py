@@ -4,6 +4,8 @@ from ..future_queue import FutureQueue
 from ..publisher import BasicPublisher, DirectPublisher
 from ..exceptions import InvalidMessageError
 
+# TODO: use `mandatory`
+
 """
 Protocol:
 
