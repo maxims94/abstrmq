@@ -7,7 +7,7 @@ from .rmqapp import RMQApp
 
 from abstrmq import RMQClient
 
-from aiormq import AMQPConnectionError
+from aiormq import AMQPError, AMQPConnectionError
 
 import logging
 log = logging.getLogger(__name__)
@@ -93,6 +93,12 @@ class RMQNode(RunBase):
     def app_handler(exc):
       if self.app.global_exception_handler:
         return self.app.global_exception_handler(exc)
+
+      # TODO: test
+      if isinstance(exc, AMQPError):
+        self._on_conn_close()
+        return False
+
     self.global_exception_handler = app_handler
 
     try:
