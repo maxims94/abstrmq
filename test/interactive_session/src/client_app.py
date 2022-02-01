@@ -36,13 +36,16 @@ class ClientSession(InteractiveClientSession):
       await self.closed()
     except asyncio.CancelledError:
       log.debug("Cancelled")
-      await self.publish_close()
+
+      with suppress(Exception):
+        # This is dangerous since the channel may be closed!
+        await self.publish_close()
     finally:
       # Will also close the receive loop
       await self._mgr.close()
 
   async def process_message(self, msg):
-    log.info(f"Received: {msg.content}")
+    log.info(f"Received: {msg}")
 
 class ClientApp(RMQApp):
   def __init__(self):

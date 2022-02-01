@@ -11,6 +11,7 @@ class RMQClient:
     self._conn = None
     self._ch = []
     self.on_close = None
+    self.closed = False
 
   async def connect(self, *args, **kwargs):
     """
@@ -23,11 +24,17 @@ class RMQClient:
 
   def on_connection_close(self, fut):
     log.debug("Connection closed")
+
+    self.closed = True
+
     if self.on_close:
       self.on_close()
 
   def on_channel_close(self, fut):
     log.debug("Channel closed")
+
+    self.closed = True
+
     if self.on_close:
       self.on_close()
 
@@ -46,6 +53,7 @@ class RMQClient:
 
   async def close(self):
     log.debug("Close")
+    self.closed = True
 
     try:
       for ch in self._ch:

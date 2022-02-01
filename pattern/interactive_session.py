@@ -155,7 +155,7 @@ class InteractiveClientSession(InteractiveSessionBase):
     assert self.state.is_in(InteractiveSessionState.INIT)
 
     if timeout is None:
-      timeout = START_REPLY_TIMEOUT
+      timeout = self.START_REPLY_TIMEOUT
 
     self.publisher = publisher
     publisher.reply_to = self.queue.name
