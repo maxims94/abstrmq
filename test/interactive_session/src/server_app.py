@@ -39,9 +39,7 @@ class BasicSession(InteractiveServerSession):
       await self.closed()
     except asyncio.CancelledError:
       log.debug("Cancelled session")
-      with suppress(Exception):
-        # This is dangerous since the channel may be closed!
-        await self.publish_close()
+      await self.publish_close()
     finally:
       await self._mgr.close()
 

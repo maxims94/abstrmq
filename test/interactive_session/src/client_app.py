@@ -36,10 +36,7 @@ class ClientSession(InteractiveClientSession):
       await self.closed()
     except asyncio.CancelledError:
       log.debug("Cancelled")
-
-      with suppress(Exception):
-        # This is dangerous since the channel may be closed!
-        await self.publish_close()
+      await self.publish_close()
     finally:
       # Will also close the receive loop
       await self._mgr.close()

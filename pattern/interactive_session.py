@@ -105,6 +105,12 @@ class InteractiveSessionBase(FutureQueueSession):
   async def publish_close(self):
     """
     Node closes session and notifies the remote node
+
+    This is a courtesy message!
+
+    It should be unproblematic if this fails (e.g. because the channel is closed -- a common reason for cancellation!)
+
+    The remote will eventually realize that this connection is closed because heartbeats will fail
     """
     assert self.is_started()
 
@@ -117,8 +123,11 @@ class InteractiveSessionBase(FutureQueueSession):
     # Do this before publishing so that the receive loop will drop any messages received from now on
     # This will typically also start the `finally` clause of `run`
     await self.state.set(InteractiveSessionState.CLOSED)
-
-    await self.publish({'_session': 'close'})
+    
+    # Suppress timeout, closed channel, bad connection etc.
+    # The application should not fail because of this!
+    with suppress(Exception):
+      await self.publish({'_session': 'close'})
 
   def started(self):
     """
