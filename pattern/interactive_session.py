@@ -91,11 +91,14 @@ class InteractiveSessionBase(FutureQueueSession):
           # Ignore invalid message
           log.debug(f"Invalid internal message: {msg.short_str()}")
       else:
-        await self.process_message(msg)
+        # NOT in a task; ensures that you process messages chronologically
+        await self.process_message(msg.content)
 
   async def process_message(self, msg):
     """
-    Callback function for payload messages
+    Callback function for payload of messages
+
+    msg is a dict, not a QueueMessage!
     """
     pass
 
