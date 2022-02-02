@@ -39,6 +39,7 @@ class BasicSession(InteractiveServerSession):
       await self.closed()
     except asyncio.CancelledError:
       log.debug("Cancelled session")
+      # Disable for testing purposes
       await self.publish_close()
     finally:
       await self._mgr.close()
@@ -47,12 +48,17 @@ class BasicSession(InteractiveServerSession):
     i = self._from
     while i <= self._to:
       log.info(f"Publish: {i}")
-      with suppress(asyncio.TimeoutError):
+
+      try:
         await self.publish_message({'current': i})
+      except Exception as ex:
+        log.error(f"Exception: {ex}")
+        break
 
       await asyncio.sleep(self._sleep)
       i += 1
 
+    # Disable for testing purposes
     await self.publish_close()
 
   async def process_message(self, msg):

@@ -21,11 +21,13 @@ class BasicPublisher:
     # Default reply_to
     self.reply_to = None
 
-  async def publish(self, message, exchange='', routing_key='', reply_to=None, persistent=False, corr_id=None, timeout=None, headers={}):
+  async def publish(self, message, exchange='', routing_key='', reply_to=None, persistent=False, corr_id=None, timeout=None, mandatory=False, headers={}):
     """
     Publishes a message. Only only publishes with a timeout
 
-    Raises TimeoutError
+    Raises TimeoutError if a timeout was defined
+
+    If you set mandatory=True and the message can't be delivered, aiormq.exceptions.PublishError will be raised
 
     :param message: a dict that will be encoded as JSON
     :param timeout:
@@ -62,6 +64,7 @@ class BasicPublisher:
           reply_to = reply_to,
           headers = headers
           ),
+        mandatory = mandatory,
         timeout = timeout
       )
     except asyncio.TimeoutError:

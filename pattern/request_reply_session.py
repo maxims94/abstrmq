@@ -120,7 +120,7 @@ class RequestReplyServerSession(FutureQueueSession):
     """
     Publish reply to client
 
-    :raises: TimeoutErrro
+    :raises: TimeoutError
     """
 
     await self.publish(*args, **kwargs)

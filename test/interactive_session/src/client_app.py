@@ -16,7 +16,7 @@ class ClientSession(InteractiveClientSession):
 
     try:
       if not bool(os.environ.get('INVALID', 0)):
-        config = {'command': 'count', 'from': 1, 'to': random.randint(2,10), 'sleep': random.random()*2}
+        config = {'command': 'count', 'from': 1, 'to': random.randint(5,20), 'sleep': random.random()*2+1}
       else:
         config = {'command': 'count', 'invalid': 1}
 
@@ -36,13 +36,14 @@ class ClientSession(InteractiveClientSession):
       await self.closed()
     except asyncio.CancelledError:
       log.debug("Cancelled")
+      # Disable this to test mandatory=True!
       await self.publish_close()
     finally:
       # Will also close the receive loop
       await self._mgr.close()
 
   async def process_message(self, msg):
-    log.info(f"Received: {msg}")
+    log.info(f"Received: {msg.content}")
 
 class ClientApp(RMQApp):
   def __init__(self):
@@ -53,7 +54,7 @@ class ClientApp(RMQApp):
 
     self._ch = await self.client.channel()
 
-    self._queue = FutureQueue(self._ch, '')
+    self._queue = FutureQueue(self._ch, '', auto_delete = True)
     await self._queue.declare()
     await self._queue.start_consume()
 
@@ -65,3 +66,5 @@ class ClientApp(RMQApp):
       log.debug("Cancelled")
     finally:
       await self._mgr.close()
+
+      #await self._queue.delete()
