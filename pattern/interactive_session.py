@@ -8,7 +8,6 @@ from ..task_manager import TaskManager
 import asyncio
 from asyncio import Event
 from enum import Enum
-from contextlib import suppress
 import logging
 
 log = logging.getLogger(__name__)
@@ -118,6 +117,7 @@ class InteractiveSessionBase(FutureQueueSession):
       return
 
     # Do this first since this is used read by `finally`, which is invoked after setting state to CLOSED
+    # Set this to True even if publishing the message fails
     self._has_closed_session = True
 
     # Do this before publishing so that the receive loop will drop any messages received from now on
@@ -126,8 +126,12 @@ class InteractiveSessionBase(FutureQueueSession):
     
     # Suppress timeout, closed channel, bad connection etc.
     # The application should not fail because of this!
-    with suppress(Exception):
+    try:
       await self.publish({'_session': 'close'})
+    except asyncio.CancelledError:
+      log.warning("publish_close cancelled")
+    except Exception as ex:
+      log.warning(f"publish_close didn't run: {ex}")
 
   def started(self):
     """

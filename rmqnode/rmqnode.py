@@ -25,7 +25,7 @@ class RMQNode(RunBase):
     """
     :param app_cls: class derived from RMQApp
     :param broker_url:
-    :param restart: if true, restart the application on connection failure
+    :param restart: if true, restart the application on connection failure (only in this case -- not general application failure!)
     :param max_conn_tries: positive integer for limited number, infinite otherwise (use -1 by convention)
     :param retry_interval: time to wait between connection attempts (seconds)
     """
