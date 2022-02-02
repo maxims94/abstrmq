@@ -32,6 +32,7 @@ class InteractiveSessionState(Enum):
 
 class InteractiveSessionBase(FutureQueueSession):
 
+  HEARTBEAT_ENABLED = True
   HEARTBEAT_INTERVAL = 10
   HEARTBEAT_TIMEOUT = 2
 
@@ -74,6 +75,11 @@ class InteractiveSessionBase(FutureQueueSession):
 
     assert self.is_started()
 
+    if not self.HEARTBEAT_ENABLED:
+      return
+
+    log.debug("Start heartbeat")
+
     while True:
 
       if self.is_closed():
@@ -105,7 +111,7 @@ class InteractiveSessionBase(FutureQueueSession):
         await self.state.set(InteractiveSessionState.CLOSED)
         return
       else:
-        log.debug("Heartbeat successful")
+        log.info("Heartbeat successful")
 
   async def _publish_pong(self):
     try:
@@ -146,15 +152,20 @@ class InteractiveSessionBase(FutureQueueSession):
           log.debug("Close received")
           await self.state.set(InteractiveSessionState.CLOSED)
           break
-
         elif msg.content == {'_session': 'ping'}:
-          log.debug("Ping received")
-          self._mgr.create_task(self._publish_pong())
+          if self.HEARTBEAT_ENABLED:
+            log.debug("Ping received")
+            self._mgr.create_task(self._publish_pong())
+          else:
+            log.debug("Ignore heartbeat")
 
         elif msg.content == {'_session': 'pong'}:
-          log.debug("Pong received")
-          if self._heartbeat_fut is not None and not self._heartbeat_fut.done():
-            self._heartbeat_fut.set_result(True)
+          if self.HEARTBEAT_ENABLED:
+            log.debug("Pong received")
+            if self._heartbeat_fut is not None and not self._heartbeat_fut.done():
+              self._heartbeat_fut.set_result(True)
+          else:
+            log.debug("Ignore heartbeat")
 
         else:
           # Ignore invalid message
