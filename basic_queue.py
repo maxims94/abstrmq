@@ -72,7 +72,7 @@ class QueueMessage:
   def assert_exact_keys(self, *keys):
     self.assert_is_dict()
     if set(keys) != self.content.keys():
-      raise InvalidMessageError(f"Wrong keys. Need: {', '.join(keys)}")
+      raise InvalidMessageError(f"Wrong keys. Expected: {', '.join(map(repr,keys))}")
     return True
 
   def assert_is_dict(self):
