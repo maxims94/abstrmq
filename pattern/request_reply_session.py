@@ -3,6 +3,10 @@ from ..future_queue_session import FutureQueueSession
 from ..future_queue import FutureQueue
 from ..publisher import BasicPublisher, DirectPublisher
 from ..exceptions import InvalidMessageError
+from ..managed_queue import ManagedQueue
+
+import logging
+log = logging.getLogger(__name__)
 
 # TODO: use `mandatory`
 
@@ -21,12 +25,17 @@ class RequestReplyClientSession(FutureQueueSession):
   """
   Usage:
 
-  session = RequestReplyClientSession(reply_queue, publisher)
+
+  ex = HeadersExchange(self._ch, exchange)
+  await ex.declare()
+  pub = HeadersExchangePublisher(self._ch, exchange)
+
+  session = RequestReplyClientSession(reply_queue, pub)
   try:
     await session.publish_request(body)
     reply = await session.receive_reply(validator=func)
   except RemoteError:
-    print("invalid client request")
+    print("Invalid server reply")
   except asyncio.TimeoutError:
     print("timeout")
   except asyncio.CancelledError:
@@ -40,8 +49,13 @@ class RequestReplyClientSession(FutureQueueSession):
     super().__init__(reply_queue, publisher)
     self.set_corr_id()
     self.publisher.reply_to = self.queue.name
+    self._register_fut = None
 
   async def publish_request(self, *args, **kwargs):
+
+    if isinstance(self.queue, ManagedQueue):
+      # corr_id is already set
+      self._register_fut = self.register()
 
     if 'timeout' not in kwargs:
       kwargs['timeout'] = self.PUBLISH_REQUEST_TIMEOUT
@@ -61,10 +75,16 @@ class RequestReplyClientSession(FutureQueueSession):
     :rtype: QueueMessage
     """
     timeout = timeout or self.RECEIVE_REPLY_TIMEOUT
-    msg = await super().receive(timeout=timeout)
-    if validator:
-      validator(msg)
-    return msg
+    try:
+      msg = await super().receive(timeout=timeout)
+      if validator:
+        validator(msg)
+      return msg
+    except (asyncio.CancelledError, Exception) as ex:
+      raise ex
+    finally:
+      if self._register_fut is not None:
+        self.deregister(self._register_fut)
 
 class RequestReplyServerSession(FutureQueueSession):
   """
@@ -83,6 +103,10 @@ class RequestReplyServerSession(FutureQueueSession):
     print("timeout")
   except asyncio.CancelledError:
     print("cancelled")
+
+  ManagedQueue
+  * Registration must be done outside of this session!
+  * Reason: The request is registered as long as receive_request is running. Now consider a session loop that just received a message and is currently processing it. receive_request is not active, so the Future is not registered, so further requests will be dropped instead of queued!
   """
 
   def __init__(self, request_queue: FutureQueue):

@@ -54,7 +54,7 @@ class BasicExchange:
     NOTE: Use the queue's name as argument instead of an object to keep it flat and decoupled
     
     :param queue: name of queue
-    :raises asyncio.TimeoutError:
+    :raises: asyncio.TimeoutError
     """
 
     if 'arguments' in kwargs:
@@ -94,6 +94,7 @@ class HeadersExchange(BasicExchange):
   async def bind(self, queue: str, headers: dict = {}, match='all'):
     assert match in ['any', 'all']
 
+    headers = headers.copy()
     headers['x-match'] = match
 
     return await super().bind(queue, arguments=headers)
@@ -101,6 +102,7 @@ class HeadersExchange(BasicExchange):
   async def unbind(self, queue: str, headers: dict = {}, match='all'):
     assert match in ['any', 'all']
 
+    headers = headers.copy()
     headers['x-match'] = match
 
     return await super().unbind(queue, arguments=headers)

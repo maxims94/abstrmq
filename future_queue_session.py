@@ -28,7 +28,7 @@ class FutureQueueSession:
 
     This CAN be called by the user if they need the corr_id early. It only makes sense for clients.
     """
-    assert self.corr_id is None
+    assert self.corr_id is None, "corr_id is already set"
 
     if corr_id is None:
       corr_id = str(uuid.uuid4())
@@ -126,16 +126,14 @@ class FutureQueueSession:
   def __repr__(self):
     return f"<FutureQueueSession corr_id={self.corr_id}>"
 
-  #
   # Remark on ManagedQueues: We can't register a session on all messages with a certain corr_id since we don't know whether it will really handle all of them
-  # But we can provide helper methods!
-  #
+  # But we can provide helper methods in case this is true!
 
   def register(self, *args, **kwargs):
-    assert isinstance(self.queue, ManagedQueue)
-    assert self.corr_id is not None
+    assert isinstance(self.queue, ManagedQueue), "Must be ManagedQueue"
+    assert self.corr_id is not None, "corr_id not set"
     return self.queue.register(corr_id = self.corr_id, *args, **kwargs)
 
   def deregister(self, fut):
-    assert isinstance(self.queue, ManagedQueue)
+    assert isinstance(self.queue, ManagedQueue), "Must be ManagedQueue"
     self.queue.deregister(fut)

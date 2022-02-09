@@ -25,18 +25,22 @@ class BasicPublisher:
     """
     Publishes a message. Only only publishes with a timeout
 
-    Raises TimeoutError if a timeout was defined
+    :raises TimeoutError: if a timeout was defined
+    :raises TypeError: if the message is not JSON serializable
 
     If you set mandatory=True and the message can't be delivered, aiormq.exceptions.PublishError will be raised
 
-    :param message: a dict that will be encoded as JSON
+    :param message: an object that will be encoded as JSON
     :param timeout:
     """
 
     msg_str = str(message)
     if len(msg_str) > self.MAX_LOG_LEN:
       msg_str = msg_str[:self.MAX_LOG_LEN-3]+"..."
-    log.info('Publish message: %s', msg_str)
+    if not headers:
+      log.info('Publish message: %s', msg_str)
+    else:
+      log.info('Publish message: %s (headers: %s)', msg_str, str(headers))
 
     body = json.dumps(message).encode()
 

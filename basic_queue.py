@@ -116,6 +116,8 @@ class BasicQueue:
   BasicQueue represents a AMQP queue with a single consumer
   """
 
+  # TODO: bind / unbind to exchange
+
   QUEUE_DECLARE_TIMEOUT = 1
   QUEUE_DELETE_TIMEOUT = 1
   QUEUE_PURGE_TIMEOUT = 1
@@ -158,12 +160,15 @@ class BasicQueue:
     #log.debug("Purge queue")
     await self._ch.queue_purge(queue=self._name, timeout=self.QUEUE_PURGE_TIMEOUT)
 
-  async def start_consume(self, on_message, **kwargs):
+  async def start_consume(self, on_message, no_ack=True, **kwargs):
+    """
+    no_ack is set to True by default since this is most common
+    """
     assert self._name
     log.debug("Consume queue")
     self.on_message = on_message
     # TODO: set as exclusive consumer
-    result = await self._ch.basic_consume(self._name, self._on_message, **kwargs)
+    result = await self._ch.basic_consume(self._name, self._on_message, no_ack=no_ack, **kwargs)
     self._consumer_tag = result.consumer_tag
 
   @property

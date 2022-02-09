@@ -35,7 +35,9 @@ class SessionManager(TaskManager):
 
   async def new_session(self, session):
     """
-    Creates a new session object, starts it in a new task and returns it
+    :param session: AbstractSession instance
+
+    TODO: raises?
     """
     log.debug("New session")
 

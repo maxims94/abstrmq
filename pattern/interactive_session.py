@@ -43,7 +43,10 @@ class InteractiveSessionBase(FutureQueueSession):
     self._mgr = TaskManager()
     self.state = StateCondition(InteractiveSessionState, InteractiveSessionState.INIT)
     self._has_closed_session = False
+    self._has_remote_closed = False
     self._heartbeat_fut = None
+    self._heartbeat_failed = False
+    self._register_fut = None
 
   @property
   def has_closed_session(self):
@@ -51,6 +54,28 @@ class InteractiveSessionBase(FutureQueueSession):
     Whether or not this node has initiated closing the session
     """
     return self._has_closed_session
+
+  @property
+  def has_remote_closed(self):
+    return self._has_remote_closed
+
+  @property
+  def heartbeat_failed(self):
+    return self._heartbeat_failed
+
+  @property
+  def close_reason(self):
+    assert self.is_closed()
+
+    reason = "Unknown reason"
+    if self.has_closed_session:
+      reason = "Closed by local"
+    elif self.heartbeat_failed:
+      reason = "Heartbeat failed"
+    elif self.has_remote_closed:
+      reason = "Closed by remote"
+
+    return reason
 
   async def publish_message(self, *args, **kwargs):
     """
@@ -108,6 +133,7 @@ class InteractiveSessionBase(FutureQueueSession):
         await asyncio.wait_for(self._heartbeat_fut, timeout=self.HEARTBEAT_TIMEOUT)
       except asyncio.TimeoutError:
         log.error("Heartbeat timed out")
+        self._heartbeat_failed = True
         await self.state.set(InteractiveSessionState.CLOSED)
         return
       else:
@@ -120,6 +146,14 @@ class InteractiveSessionBase(FutureQueueSession):
       return
     except Exception as ex:
       log.warning(f"Failed to send pong: {ex}")
+
+  async def _deregister_on_close(self):
+    try:
+      await self.closed()
+      if self._register_fut is not None:
+        self.deregister(self._register_fut)
+    except asyncio.CancelledError:
+      return
 
   async def _base_recv_loop(self):
     """
@@ -141,7 +175,7 @@ class InteractiveSessionBase(FutureQueueSession):
         msg = await self.receive()
       except asyncio.CancelledError:
         log.debug("Cancel receive loop")
-        break
+        return
 
       if self.is_closed():
         log.warning(f"Dropped message due to closed session: ({msg.short_str()})")
@@ -150,8 +184,12 @@ class InteractiveSessionBase(FutureQueueSession):
       if '_session' in msg.content:
         if msg.content == {'_session': 'close'}:
           log.debug("Close received")
-          await self.state.set(InteractiveSessionState.CLOSED)
-          break
+          self._has_remote_closed = True
+          try:
+            await self.state.set(InteractiveSessionState.CLOSED)
+          except asyncio.CancelledError:
+            pass
+          return
         elif msg.content == {'_session': 'ping'}:
           if self.HEARTBEAT_ENABLED:
             log.debug("Ping received")
@@ -171,8 +209,12 @@ class InteractiveSessionBase(FutureQueueSession):
           # Ignore invalid message
           log.debug(f"Invalid internal message: {msg.short_str()}")
       else:
-        # NOT in a task; ensures that you process messages chronologically
-        await self.process_message(msg)
+        try:
+          # Do NOT run in a task
+          # This ensures that messages are processed chronologically
+          await self.process_message(msg)
+        except asyncio.CancelledError:
+          return
 
   async def process_message(self, msg):
     """
@@ -299,6 +341,7 @@ class InteractiveClientSession(InteractiveSessionBase):
       await self.state.set(InteractiveSessionState.RUNNING)
       self._mgr.create_task(self._base_recv_loop())
       self._mgr.create_task(self._base_heartbeat())
+      self._mgr.create_task(self._deregister_on_close())
 
     elif state == 'start_failure':
       await self.state.set(InteractiveSessionState.CLOSED)
@@ -310,18 +353,18 @@ class InteractiveClientSession(InteractiveSessionBase):
 
 class InteractiveServerSession(InteractiveSessionBase):
   """
-  Protocol:
+  Usage:
 
-  msg = receive_start()
-  [process message]
-  Then, you must either publish_success() or publish_failure() (and terminate the session)
+  def run():
+    msg = receive_start()
+    [process message]
+    Then, you must either publish_success() or publish_failure() (and terminate the session)
   """
 
   async def receive_start(self, *args, **kwargs):
     """
     Wait for the client to initiate a new session.
 
-    :param validator: a callback that checks whether the request is valid. Takes one argument (the message). Expected to throw a RemoteError if the request is invalid.
     :raises: TimeoutError, RemoteError, any Exception from process_message
     """
 
@@ -344,17 +387,28 @@ class InteractiveServerSession(InteractiveSessionBase):
 
   async def publish_success(self):
 
+    if isinstance(self.queue, ManagedQueue):
+      self._register_fut = self.register()
+
     try:
       await self.publish({'_session': 'start_success'}, mandatory=True)
+    except asyncio.TimeoutError:
+      await self.state.set(InteractiveSessionState.CLOSED)
+      raise InteractiveSessionError(f"Timeout during publish_success")
     except PublishError as ex:
       await self.state.set(InteractiveSessionState.CLOSED)
       raise InteractiveSessionError(f"Can't route publish_success message: {repr(ex)}")
-
-    await self.state.set(InteractiveSessionState.RUNNING)
-    self._mgr.create_task(self._base_recv_loop())
-    self._mgr.create_task(self._base_heartbeat())
+    else:
+      await self.state.set(InteractiveSessionState.RUNNING)
+      self._mgr.create_task(self._base_recv_loop())
+      self._mgr.create_task(self._base_heartbeat())
+      self._mgr.create_task(self._deregister_on_close())
 
   async def publish_failure(self, msg):
 
-    await self.publish({'_session': 'start_failure', '_message': msg}, mandatory=False)
-    await self.state.set(InteractiveSessionState.CLOSED)
+    try:
+      await self.publish({'_session': 'start_failure', '_message': msg}, mandatory=False)
+    except Exception as ex:
+      log.warning(f"publish_failure failed: {ex}")
+    finally:
+      await self.state.set(InteractiveSessionState.CLOSED)
