@@ -123,7 +123,7 @@ class InteractiveSessionBase(FutureQueueSession):
       try:
         await self.publish({'_session': 'ping'}, mandatory=True)
       except Exception as ex:
-        log.error("Failed to publish heartbeat: {repr(ex)})")
+        log.error(f"Failed to publish heartbeat: {repr(ex)})")
         await self.state.set(InteractiveSessionState.CLOSED)
         return
       except asyncio.CancelledError:
@@ -220,7 +220,7 @@ class InteractiveSessionBase(FutureQueueSession):
     """
     Callback function for payload of messages
 
-    msg is a dict, not a QueueMessage!
+    msg is a QueueMessage!
     """
     pass
 
@@ -256,7 +256,7 @@ class InteractiveSessionBase(FutureQueueSession):
     except asyncio.CancelledError:
       log.warning("publish_close cancelled")
     except Exception as ex:
-      log.warning(f"publish_close didn't run: {ex}")
+      log.warning(f"publish_close failed: {ex}")
 
   def started(self):
     """

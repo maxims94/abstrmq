@@ -26,7 +26,6 @@ class StateCondition:
   
   async def set(self, state):
     assert isinstance(state, self._cls)
-    assert self._state != state
 
     self._state = state
     async with self._cond:
