@@ -5,6 +5,8 @@ from ..publisher import BasicPublisher, DirectPublisher
 from ..exceptions import InvalidMessageError
 from ..managed_queue import ManagedQueue
 
+from aiormq.exceptions import PublishError
+
 import logging
 log = logging.getLogger(__name__)
 
@@ -52,6 +54,9 @@ class RequestReplyClientSession(FutureQueueSession):
     self._register_fut = None
 
   async def publish_request(self, *args, **kwargs):
+    """
+    :raises: TimeoutError, PublishError
+    """
 
     if isinstance(self.queue, ManagedQueue):
       # corr_id is already set
@@ -59,6 +64,9 @@ class RequestReplyClientSession(FutureQueueSession):
 
     if 'timeout' not in kwargs:
       kwargs['timeout'] = self.PUBLISH_REQUEST_TIMEOUT
+
+    if 'mandatory' not in kwargs:
+      kwargs['mandatory'] = True
 
     await super().publish(*args, **kwargs)
 
@@ -144,8 +152,11 @@ class RequestReplyServerSession(FutureQueueSession):
     """
     Publish reply to client
 
-    :raises: TimeoutError
+    :raises: TimeoutError, PublishError
     """
+
+    if 'mandatory' not in kwargs:
+      kwargs['mandatory'] = True
 
     await self.publish(*args, **kwargs)
 

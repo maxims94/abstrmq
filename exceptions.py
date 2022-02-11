@@ -6,7 +6,9 @@ class UserInterruptError(Exception):
 
 class RemoteError(Exception):
   """
-  Any error that was caused by the remote host, such as an invalid request
+  Any error that was caused by the remote host
+
+  Example: invalid server reply, invalid client request
   """
   pass
 

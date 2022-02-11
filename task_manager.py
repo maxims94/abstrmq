@@ -8,6 +8,12 @@ log = logging.getLogger(__name__)
 # TODO
 # Support task naming and getting a task by name
 
+"""
+TaskManager manages a collection of tasks
+
+Note that as long as you ensure that the tasks exit, you don't necessarily need to do `await tmgr.close()` or similar! The cleanup is done automatically!
+"""
+
 class TaskManager:
   def __init__(self):
     self._tasks = []
