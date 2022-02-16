@@ -7,6 +7,7 @@ log = logging.getLogger(__name__)
 
 # TODO
 # Support task naming and getting a task by name
+# asyncio.create_task(coro, *, name=None)!! as well as Task.name etc.!
 
 """
 TaskManager manages a collection of tasks

@@ -43,8 +43,8 @@ class FutureQueueSession:
       return "empty"
 
   async def receive(self, *args, **kwargs):
-    assert self._open
-    assert self.queue
+    assert self._open, "Session not open"
+    assert self.queue, "No queue"
 
     try:
       # self.corr_id may be None
@@ -67,8 +67,8 @@ class FutureQueueSession:
       return result
 
   async def publish(self, *args, **kwargs):
-    assert self._open
-    assert self.publisher
+    assert self._open, "Session not open"
+    assert self.publisher, "No publisher"
 
     if self.corr_id is None:
       self.set_corr_id()
@@ -82,7 +82,7 @@ class FutureQueueSession:
     Note that if you use SessionManager, this is invoked automatically after `run` is done! No need to do it manually!
     """
 
-    assert self._open
+    assert self._open, "Session not open"
 
     log.debug("Close session: %s", self.corr_id)
 
