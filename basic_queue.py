@@ -38,10 +38,10 @@ class QueueMessage:
     await self.ch.basic_ack(self.delivery_tag)
 
   def __str__(self):
-    return str(self.content)
+    return self.short_str()
 
   def short_str(self, max_len=None):
-    tmp = str(self)
+    tmp = str(self.content)
     if max_len is None:
       max_len = self.MAX_SHORT_STR
     if len(tmp) > max_len:
@@ -49,7 +49,8 @@ class QueueMessage:
     return tmp
   
   def __repr__(self):
-    return f"<QueueMessage: {self.delivery_tag}>"
+    #return f"<QueueMessage: delivery_tag={self.delivery_tag}>"
+    return f"<QueueMessage: content={self.short_str()}, headers={self.headers}, reply_to={self.reply_to}, self.corr_id={self.corr_id}, delivery_tag={self.delivery_tag}>"
 
   def match_dict(self, sub: dict):
     return _dict_subset(sub, self.content)
@@ -105,11 +106,22 @@ class QueueMessage:
       raise InvalidMessageError(msg)
     return True
   
-  def get(self, key):
+  def get(self, key, default=None):
+    self.assert_is_dict()
     if not key in self.content:
+      if default is not None:
+        return default
       raise InvalidMessageError(f"Expected key '{key}' not found")
     else:
       return self.content[key]
+
+  def headers_get(self, key, default=None):
+    if not key in self.headers:
+      if default is not None:
+        return default
+      raise InvalidMessageError(f"Expected key '{key}' not found in headers")
+    else:
+      return self.headers[key]
 
 class BasicQueue:
   """

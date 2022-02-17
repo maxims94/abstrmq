@@ -115,6 +115,32 @@ class RequestReplyServerSession(FutureQueueSession):
   ManagedQueue
   * Registration must be done outside of this session!
   * Reason: The request is registered as long as receive_request is running. Now consider a session loop that just received a message and is currently processing it. receive_request is not active, so the Future is not registered, so further requests will be dropped instead of queued!
+
+  Example:
+
+  async def ping_service(self):
+    match_dict = {'class': 'order', 'method': 'ping'}
+
+    await self._ex.bind(self._queue.name, match_dict)
+    fut = self._queue.register(headers_eq=match_dict)
+
+    while True:
+
+      session = RequestReplyServerSession(self._queue)
+
+      try:
+        request = await session.receive_request(headers_eq=match_dict)
+        log.info("Ping requested")
+        await self._reply_success(session, {})
+      except RemoteError as ex:
+        log.error(f"Invalid request: {ex}")
+        continue
+      except asyncio.TimeoutError:
+        log.warning("Timeout")
+        continue
+      except asyncio.CancelledError:
+        self._queue.deregister(fut)
+        return
   """
 
   def __init__(self, request_queue: FutureQueue):

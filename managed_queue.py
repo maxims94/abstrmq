@@ -3,6 +3,18 @@ import logging
 
 log = logging.getLogger(__name__)
 
+class RegisterManager:
+  def __init__(self, fut, queue):
+    self._fut = fut
+    self._queue = queue
+
+  async def __aenter__(self):
+    self._queue.register_fut(self._fut)
+
+  async def __aexit__(self, exc_t, exc_v, exc_tb):
+    self._queue.deregister(self._fut)
+    return False
+
 class ManagedQueue(FutureQueue):
   """
   Unregistered messages will be dropped immediately.
@@ -28,15 +40,27 @@ class ManagedQueue(FutureQueue):
     super().__init__(*args, **kwargs)
     self._register = []
 
-  def register(self, *args, **kwargs) -> MessageFuture:
-    fut = MessageFuture(*args, **kwargs)
+  def register_mgr(self, *args, **kwargs) -> MessageFuture:
+    """
+    Usage:
 
+    async with managed_queue.register_mgr():
+      [...]
+    """
+    fut = MessageFuture(*args, **kwargs)
+    return RegisterManager(fut, self)
+
+  def register_fut(self, fut) -> MessageFuture:
     # TODO: does this work? Or does it miss equal Futures (different object ids)
     assert fut not in self._register, "Future already registered"
 
     self._register.append(fut)
     log.debug(f"Register: {fut!r}")
     return fut
+
+  def register(self, *args, **kwargs) -> MessageFuture:
+    fut = MessageFuture(*args, **kwargs)
+    return self.register_fut(fut)
 
   def deregister(self, fut : MessageFuture):
     assert fut in self._register, "Future not registered"

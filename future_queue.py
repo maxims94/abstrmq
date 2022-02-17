@@ -19,6 +19,12 @@ class MessageFuture(asyncio.Future):
 
   def __init__(self, match = {}, headers = {}, headers_eq = {}, corr_id=None, custom=None, *args, **kwargs):
     super().__init__(*args, **kwargs)
+
+    assert isinstance(match, dict)
+    assert isinstance(headers, dict)
+    assert isinstance(headers_eq, dict)
+    assert custom is None or callable(custom)
+
     self._match = match
     self._headers = headers
     self._headers_eq = headers_eq
@@ -126,7 +132,7 @@ class FutureQueue(BasicQueue):
 
   async def _process_message(self, message):
 
-    log.debug(f"Process message {message!r}")
+    log.debug(f"Process message {message}")
     
     found = False
     n = 0
@@ -136,10 +142,10 @@ class FutureQueue(BasicQueue):
         n += 1
 
     if found:
-      log.debug(f"{n} Future(s) found for {message!r}")
+      log.debug(f"{n} Future(s) found for {message}")
 
     if not found:
-      log.debug(f"No future found for {message!r}")
+      log.debug(f"No future found for {message}")
 
       selected_mode = None
 
@@ -156,27 +162,27 @@ class FutureQueue(BasicQueue):
 
       if selected_mode is FutureQueueMode.WAIT:
         if len(self._wait) < self._buffer_size:
-          log.debug(f"Add to queue: {message!s}")
+          log.debug(f"Add to queue: {message}")
           self._wait.append(message) 
         else:
-          log.warning("Message buffer full: Drop message")
+          log.warning("Message buffer full: Drop message: {message!r}")
           self._on_drop(message, FutureQueueDropReason.FULL_BUFFER)
 
       if selected_mode is FutureQueueMode.DROP:
-        log.warning(f"Drop message: {message!s}")
+        log.warning(f"Drop message: {message!r}")
         self._on_drop(message, FutureQueueDropReason.NO_FUTURE_FOUND)
 
       if selected_mode is FutureQueueMode.CIRCULAR:
         # At no point are two messages added, so == is enough
         if len(self._wait) == self._buffer_size:
           old_message = self._wait.pop(0)
-          log.warning(f"Dropped old message: {old_message!s}")
+          log.warning(f"Dropped old message: {old_message!r}")
           self._on_drop(old_message, FutureQueueDropReason.FULL_BUFFER)
 
           # Sanity check (could fail if you have multiple threads)
           assert len(self._wait) < self._buffer_size
 
-        log.debug(f"Add to queue: {message!s}")
+        log.debug(f"Add to queue: {message}")
         self._wait.append(message) 
 
   async def start_consume(self, **kwargs):

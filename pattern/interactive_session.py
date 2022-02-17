@@ -213,6 +213,12 @@ class InteractiveSessionBase(FutureQueueSession):
           # Do NOT run in a task
           # This ensures that messages are processed chronologically
           await self.process_message(msg)
+        except Exception as ex:
+          # If there are errors during processing, see this as unrecoverable error and end the session
+          log.error(f"Error while processing message: {ex}")
+          # TODO: test
+          await self.publish_close()
+          return
         except asyncio.CancelledError:
           return
 
@@ -220,7 +226,7 @@ class InteractiveSessionBase(FutureQueueSession):
     """
     Callback function for payload of messages
 
-    msg is a QueueMessage!
+    :param msg: This is a QueueMessage, NOT a dict!
     """
     pass
 
@@ -235,6 +241,8 @@ class InteractiveSessionBase(FutureQueueSession):
     The remote will eventually realize that this connection is closed because heartbeats will fail
 
     NOT mandatory; we don't care if the message is dropped
+
+    Does NOT raise an exception (since it is always the same way you must handle it -- ignore it)
     """
     assert self.is_started()
 
@@ -273,6 +281,9 @@ class InteractiveSessionBase(FutureQueueSession):
     """
     return self.state.wait_for(InteractiveSessionState.CLOSED)
 
+  def is_running(self):
+    return self.state.is_in(InteractiveSessionState.RUNNING)
+
   def is_started(self):
     return self.state.is_in(InteractiveSessionState.RUNNING, InteractiveSessionState.CLOSED)
 
@@ -295,6 +306,11 @@ class InteractiveClientSession(InteractiveSessionBase):
     """
 
     assert self.state.is_in(InteractiveSessionState.INIT)
+
+    if isinstance(self.queue, ManagedQueue):
+      if self.corr_id is None:
+        self.set_corr_id()
+      self._register_fut = self.register()
 
     if timeout is None:
       timeout = self.START_REPLY_TIMEOUT
@@ -359,6 +375,23 @@ class InteractiveServerSession(InteractiveSessionBase):
     msg = receive_start()
     [process message]
     Then, you must either publish_success() or publish_failure() (and terminate the session)
+
+  Session loop:
+
+  async def sma_cross_service(self):
+    match_dict = {'class': 'platform', 'method': 'sma_cross'}
+
+    await self._ex.bind(self._queue.name, match_dict)
+    fut = self._queue.register(headers_eq=match_dict)
+
+    while True:
+
+      try:
+        session = await self._session.new_session(SMACrossSession(self._queue))
+        await session.started()
+      except asyncio.CancelledError:
+        self._queue.deregister(fut)
+        break
   """
 
   async def receive_start(self, *args, **kwargs):
