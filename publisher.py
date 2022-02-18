@@ -13,7 +13,7 @@ class BasicPublisher:
   Use this class directly if you need a generic publisher or use any of the subclasses for more specific publishers
   """
 
-  PUBLISH_TIMEOUT = 1
+  PUBLISH_TIMEOUT = 5
   MAX_LOG_LEN = 500
 
   def __init__(self, ch):

@@ -16,6 +16,7 @@ class FutureQueueSession:
   """
   def __init__(self, queue: FutureQueue = None, publisher: BasicPublisher = None, corr_id: str = None):
     self.queue = queue
+    self.ch = queue._ch
     self.publisher = publisher
     self.corr_id = corr_id
     self._open = True

@@ -1,7 +1,8 @@
 from ..future_queue_session import FutureQueueSession
 from ..future_queue import FutureQueue
 from ..managed_queue import ManagedQueue
-from ..publisher import BasicPublisher, DirectPublisher
+from ..publisher import BasicPublisher, DirectPublisher, HeadersExchangePublisher
+from ..basic_exchange import HeadersExchange
 from ..exceptions import RemoteError
 from ..state_condition import StateCondition
 from ..task_manager import TaskManager
@@ -132,6 +133,8 @@ class InteractiveSessionBase(FutureQueueSession):
       try:
         await asyncio.wait_for(self._heartbeat_fut, timeout=self.HEARTBEAT_TIMEOUT)
       except asyncio.TimeoutError:
+        if self.is_closed():
+          return
         log.error("Heartbeat timed out")
         self._heartbeat_failed = True
         await self.state.set(InteractiveSessionState.CLOSED)
@@ -141,7 +144,7 @@ class InteractiveSessionBase(FutureQueueSession):
 
   async def _publish_pong(self):
     try:
-      await self.publish({'_session': 'pong'})
+      await self.publish({'_session': 'pong'}, mandatory=True)
     except asyncio.CancelledError:
       return
     except Exception as ex:
@@ -215,7 +218,7 @@ class InteractiveSessionBase(FutureQueueSession):
           await self.process_message(msg)
         except Exception as ex:
           # If there are errors during processing, see this as unrecoverable error and end the session
-          log.error(f"Error while processing message: {ex}")
+          log.error(f"Error while processing message: {repr(ex)}")
           # TODO: test
           await self.publish_close()
           return
@@ -240,7 +243,7 @@ class InteractiveSessionBase(FutureQueueSession):
 
     The remote will eventually realize that this connection is closed because heartbeats will fail
 
-    NOT mandatory; we don't care if the message is dropped
+    Use mandatory to prevent trying to publish to a queue that no longer exists!
 
     Does NOT raise an exception (since it is always the same way you must handle it -- ignore it)
     """
@@ -257,14 +260,16 @@ class InteractiveSessionBase(FutureQueueSession):
     # This will typically also start the `finally` clause of `run`
     await self.state.set(InteractiveSessionState.CLOSED)
     
-    # Suppress timeout, closed channel, bad connection etc.
-    # The application should not fail because of this!
+    # Suppress timeout, closed channel, bad connection, PublishError etc.
+    # The application should not fail because of publish_close!
     try:
-      await self.publish({'_session': 'close'})
+      await self.publish({'_session': 'close'}, mandatory=True)
     except asyncio.CancelledError:
       log.warning("publish_close cancelled")
+    except PublishError as ex:
+      log.warning(f"Can't route publish_close message: {ex!r}")
     except Exception as ex:
-      log.warning(f"publish_close failed: {ex}")
+      log.warning(f"publish_close failed: {ex!r}")
 
   def started(self):
     """
@@ -298,11 +303,13 @@ class InteractiveClientSession(InteractiveSessionBase):
 
   START_REPLY_TIMEOUT = 2
 
-  async def publish_start(self, body, publisher: BasicPublisher, timeout=None, **kwargs):
+  async def publish_start(self, body, publisher: BasicPublisher=None, exchange=None, timeout=None, **kwargs):
     """
     Initiate a session by sending a request to the server. reply_to is added automatically
 
     :raises: InteractiveSessionError
+
+    Either provide a publisher or an exchange
     """
 
     assert self.state.is_in(InteractiveSessionState.INIT)
@@ -315,8 +322,23 @@ class InteractiveClientSession(InteractiveSessionBase):
     if timeout is None:
       timeout = self.START_REPLY_TIMEOUT
 
-    self.publisher = publisher
-    publisher.reply_to = self.queue.name
+    if exchange is not None:
+      ex = HeadersExchange(self.ch, exchange)
+
+      try:
+        await ex.declare()
+      except Exception as ex:
+        await self.state.set(InteractiveSessionState.CLOSED)
+        raise InteractiveSessionError(f"Can't declare exchange: {repr(ex)}")
+
+      self.publisher = HeadersExchangePublisher(self.ch, exchange)
+    
+    if publisher is not None:
+      self.publisher = publisher
+
+    assert self.publisher is not None
+
+    self.publisher.reply_to = self.queue.name
 
     kwargs['mandatory'] = True
     try:
