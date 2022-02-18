@@ -34,8 +34,9 @@ class MessageFuture(asyncio.Future):
 
   def is_match(self, msg : QueueMessage):
     if self._match:
-      if not msg.match_dict(self._match):
-        return False
+      if isinstance(msg.content, dict):
+        if not msg.match_dict(self._match):
+          return False
 
     if self._headers:
       if not msg.match_headers_dict(self._headers):
