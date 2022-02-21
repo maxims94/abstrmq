@@ -64,6 +64,9 @@ class QueueMessage:
     return True
 
   def assert_has_keys(self, *keys):
+    """
+    Test whether keys are a subset of the message's keys
+    """
     self.assert_is_dict()
     missing = set(keys) - self.content.keys()
     if missing:
@@ -74,6 +77,16 @@ class QueueMessage:
     self.assert_is_dict()
     if set(keys) != self.content.keys():
       raise InvalidMessageError(f"Wrong keys. Expected: {', '.join(map(repr,keys))}")
+    return True
+
+  def assert_keys_in(self, *keys):
+    """
+    Test whether keys are a superset of the message's keys
+    """
+    self.assert_is_dict()
+    unexpected = set(self.content.keys()) - set(keys)
+    if unexpected:
+      raise InvalidMessageError(f"Unexpected keys: {', '.join(map(repr,unexpected))}")
     return True
 
   def assert_is_dict(self):

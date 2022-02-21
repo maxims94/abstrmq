@@ -27,7 +27,6 @@ class RequestReplyClientSession(FutureQueueSession):
   """
   Usage:
 
-
   ex = HeadersExchange(self._ch, exchange)
   await ex.declare()
   pub = HeadersExchangePublisher(self._ch, exchange)
@@ -42,6 +41,8 @@ class RequestReplyClientSession(FutureQueueSession):
     print("timeout")
   except asyncio.CancelledError:
     print("cancelled")
+  else:
+    print(reply)
   """
 
   PUBLISH_REQUEST_TIMEOUT = 1
@@ -156,7 +157,7 @@ class RequestReplyServerSession(FutureQueueSession):
     If it is valid, return the request. It is expected that the server will process it now.
 
     :rtype: QueueMessage
-    :param validator: a callable that checks whether a request has the right format. If not, it is expected to raise a RemoteError
+    :param validator: a callable that checks whether a request has the right format. If not, it is expected to raise a RemoteError. Expected to take a QueueMessage as only argument
 
     :raises: RemoteError
     """
@@ -166,6 +167,8 @@ class RequestReplyServerSession(FutureQueueSession):
 
     msg.assert_reply_to()
     msg.assert_corr_id()
+
+    # Set this before the validator to be able to send an error message in case the validator fails
 
     self.publisher = DirectPublisher(msg.ch, msg.reply_to)
 

@@ -48,6 +48,7 @@ class InteractiveSessionBase(FutureQueueSession):
     self._heartbeat_fut = None
     self._heartbeat_failed = False
     self._register_fut = None
+    self._close_message = None
 
   @property
   def has_closed_session(self):
@@ -63,6 +64,12 @@ class InteractiveSessionBase(FutureQueueSession):
   @property
   def heartbeat_failed(self):
     return self._heartbeat_failed
+
+  @property
+  def close_message(self):
+    assert self.is_closed()
+
+    return self._close_message
 
   @property
   def close_reason(self):
@@ -185,14 +192,20 @@ class InteractiveSessionBase(FutureQueueSession):
         return
 
       if '_session' in msg.content:
-        if msg.content == {'_session': 'close'}:
-          log.debug("Close received")
+        if msg.get('_session') == 'close':
+          message = msg.content.get('_message')
+          if message is None:
+            message = "No message"
+          self._close_message = message
+          log.debug("Close received: {message}")
+
           self._has_remote_closed = True
           try:
             await self.state.set(InteractiveSessionState.CLOSED)
           except asyncio.CancelledError:
             pass
           return
+
         elif msg.content == {'_session': 'ping'}:
           if self.HEARTBEAT_ENABLED:
             log.debug("Ping received")
@@ -233,7 +246,7 @@ class InteractiveSessionBase(FutureQueueSession):
     """
     pass
 
-  async def publish_close(self):
+  async def publish_close(self, message=None):
     """
     Node closes session and notifies the remote node
 
@@ -245,7 +258,9 @@ class InteractiveSessionBase(FutureQueueSession):
 
     Use mandatory to prevent trying to publish to a queue that no longer exists!
 
-    Does NOT raise an exception (since it is always the same way you must handle it -- ignore it)
+    Does NOT raise an exception (since it is always handled in the same way: ignoring it)
+
+    Why not publish close_success and close_failure? Since we don't want to build logic that assumes that the close message can be delivered! This is merely a courtesy message!
     """
     assert self.is_started()
 
@@ -263,7 +278,7 @@ class InteractiveSessionBase(FutureQueueSession):
     # Suppress timeout, closed channel, bad connection, PublishError etc.
     # The application should not fail because of publish_close!
     try:
-      await self.publish({'_session': 'close'}, mandatory=True)
+      await self.publish({'_session': 'close', '_message': message}, mandatory=True)
     except asyncio.CancelledError:
       log.warning("publish_close cancelled")
     except PublishError as ex:
@@ -288,6 +303,8 @@ class InteractiveSessionBase(FutureQueueSession):
 
   def is_running(self):
     return self.state.is_in(InteractiveSessionState.RUNNING)
+
+  is_closable = is_running
 
   def is_started(self):
     return self.state.is_in(InteractiveSessionState.RUNNING, InteractiveSessionState.CLOSED)
@@ -318,6 +335,7 @@ class InteractiveClientSession(InteractiveSessionBase):
       if self.corr_id is None:
         self.set_corr_id()
       self._register_fut = self.register()
+      self._mgr.create_task(self._deregister_on_close())
 
     if timeout is None:
       timeout = self.START_REPLY_TIMEOUT
@@ -379,7 +397,6 @@ class InteractiveClientSession(InteractiveSessionBase):
       await self.state.set(InteractiveSessionState.RUNNING)
       self._mgr.create_task(self._base_recv_loop())
       self._mgr.create_task(self._base_heartbeat())
-      self._mgr.create_task(self._deregister_on_close())
 
     elif state == 'start_failure':
       await self.state.set(InteractiveSessionState.CLOSED)
@@ -443,7 +460,9 @@ class InteractiveServerSession(InteractiveSessionBase):
   async def publish_success(self):
 
     if isinstance(self.queue, ManagedQueue):
+      # corr_id is already set
       self._register_fut = self.register()
+      self._mgr.create_task(self._deregister_on_close())
 
     try:
       await self.publish({'_session': 'start_success'}, mandatory=True)
@@ -457,7 +476,6 @@ class InteractiveServerSession(InteractiveSessionBase):
       await self.state.set(InteractiveSessionState.RUNNING)
       self._mgr.create_task(self._base_recv_loop())
       self._mgr.create_task(self._base_heartbeat())
-      self._mgr.create_task(self._deregister_on_close())
 
   async def publish_failure(self, msg):
 
