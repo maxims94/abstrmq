@@ -86,7 +86,7 @@ class QueueMessage:
     self.assert_is_dict()
     unexpected = set(self.content.keys()) - set(keys)
     if unexpected:
-      raise InvalidMessageError(f"Unexpected keys: {', '.join(map(repr,unexpected))}")
+      raise InvalidMessageError(f"Unexpected key(s): {', '.join(map(repr,unexpected))}")
     return True
 
   def assert_is_dict(self):

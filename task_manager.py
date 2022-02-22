@@ -64,6 +64,9 @@ class TaskManager:
 
     if self.gather_exception:
       for t in ts:
+        # We ignore it if a Task was cancelled (unhandled CancelledError)
+        # We only raise an exception if case there was a genuine exception (not CancelledError)
+        # See test/task_manager/cancel.py
         if not t.cancelled() and t.exception():
           log.debug(f"Exception in {t}")
           t.result()
