@@ -128,7 +128,7 @@ class FutureQueue(BasicQueue):
     self._receive = []
     self._wait = []
     self._mode = mode
-    self._on_drop = on_drop or (lambda msg, reason: None)
+    self._on_drop = on_drop or self._on_drop_default
     self._buffer_size = buffer_size
 
   async def _process_message(self, message):
@@ -271,3 +271,11 @@ class FutureQueue(BasicQueue):
     #   t = asyncio.create_task(asyncio.wait_for(future, timeout=timeout))
     #   t.add_done_callback(react_to_timeout)
     #   return t
+
+  async def _on_drop_default(self, msg, reason):
+    if reason is FutureQueueDropReason.FULL_BUFFER:
+      log.warning(f"Buffer full. Drop: {msg.short_str()}")
+    elif reason is FutureQueueDropReason.NOT_REGISTERED:
+      log.warning(f"Unexpected message. Drop: {msg.short_str()}")
+    elif reason is FutureQueueDropReason.NO_FUTURE_FOUND:
+      log.warning(f"No future found. Drop: {msg.short_str()}")
