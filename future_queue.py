@@ -272,7 +272,7 @@ class FutureQueue(BasicQueue):
     #   t.add_done_callback(react_to_timeout)
     #   return t
 
-  async def _on_drop_default(self, msg, reason):
+  def _on_drop_default(self, msg, reason):
     if reason is FutureQueueDropReason.FULL_BUFFER:
       log.warning(f"Buffer full. Drop: {msg.short_str()}")
     elif reason is FutureQueueDropReason.NOT_REGISTERED:

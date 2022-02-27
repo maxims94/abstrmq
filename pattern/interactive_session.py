@@ -22,6 +22,11 @@ Full-duplex communication between client and server
 # TODO: timeout for receiving messages from the server (subclasses can't define a timeout, they only react if a message arrives)
 # TODO: heartbeat; e.g. close the message if the other side hasn't responded in X seconds after a heartbeat request; reset timer on a new message; this must exist for BOTH client and server!! i.e. part of Base; this hsould be ENOUGH for both client and server to establish that the remote is available
 
+# TODO: find a better way to deregister, as this can cause race conditions if used together with self._mgr.close()
+# e.g. in base loop?
+# TODO: there should be an automatic cleanup before setting CLOSED (e.g. _mgr.close(), deregistering); otherwise the subclass needs to access _mgr! Also, use __mgr!
+# Probably: replace set(CLOSED) by __close() or similar; it can also run FutureQueueSession.close()
+
 class InteractiveSessionError(Exception):
   pass
 
