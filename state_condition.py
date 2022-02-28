@@ -1,6 +1,8 @@
 from asyncio import Condition
 from enum import Enum
 
+# TODO: suppose you have states 1, ..., N: wait_for(>=i) [e.g. either CLOSING or SHUTDOWN or DONE]; very simple if you have a linear order on the Enum
+
 class StateCondition:
   """
   A synchronization primitive that represents a finite state machine
@@ -51,6 +53,10 @@ class StateCondition:
   @property
   def current(self):
     return self._state
+
+  @property
+  def value(self):
+    return self._state.value
 
   def __repr__(self):
     return f'<{self.__class__.__name__}, {self._state.value}, {self._data}>'

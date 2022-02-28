@@ -96,7 +96,7 @@ class InteractiveSessionBase(FutureQueueSession):
 
     In a running session, we expect that all messages that are sent will be delivered (i.e. mandatory=True). This is the default. You can switch this off by setting the kwarg explicitly
 
-    :raises: TimeoutError
+    :raises: TimeoutError, InteractiveSessionError
     """
     assert self.state.is_in(InteractiveSessionState.RUNNING)
 
@@ -107,7 +107,7 @@ class InteractiveSessionBase(FutureQueueSession):
       await self.publish(*args, **kwargs)
     except PublishError as ex:
       await self.state.set(InteractiveSessionState.CLOSED)
-      raise InteractiveSessionError(f"Can't route message: {repr(ex)}")
+      raise InteractiveSessionError(f"Can't route message: {ex!r}")
   
   async def _base_heartbeat(self):
 
@@ -291,6 +291,7 @@ class InteractiveSessionBase(FutureQueueSession):
     except Exception as ex:
       log.warning(f"publish_close failed: {ex!r}")
 
+  # TODO: wait_for_started
   def started(self):
     """
     Usage:
@@ -299,6 +300,7 @@ class InteractiveSessionBase(FutureQueueSession):
     """
     return self.state.wait_for(InteractiveSessionState.RUNNING, InteractiveSessionState.CLOSED)
 
+  # TODO: wait_for_closed
   def closed(self):
     """
     Usage:
@@ -476,7 +478,7 @@ class InteractiveServerSession(InteractiveSessionBase):
       raise InteractiveSessionError(f"Timeout during publish_success")
     except PublishError as ex:
       await self.state.set(InteractiveSessionState.CLOSED)
-      raise InteractiveSessionError(f"Can't route publish_success message: {repr(ex)}")
+      raise InteractiveSessionError(f"Can't route publish_success message: {ex!r}")
     else:
       await self.state.set(InteractiveSessionState.RUNNING)
       self._mgr.create_task(self._base_recv_loop())
