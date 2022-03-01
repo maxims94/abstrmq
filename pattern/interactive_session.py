@@ -274,7 +274,9 @@ class InteractiveSessionBase(FutureQueueSession):
 
     # Do this first since this is used read by `finally`, which is invoked after setting state to CLOSED
     # Set this to True even if publishing the message fails
-    self._has_closed_session = True
+    # This is only true if the remote hasn't already closed the session
+    if not self._has_remote_closed:
+      self._has_closed_session = True
 
     # Do this before publishing so that the receive loop will drop any messages received from now on
     # This will typically also start the `finally` clause of `run`
