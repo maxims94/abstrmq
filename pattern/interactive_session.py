@@ -27,6 +27,8 @@ Full-duplex communication between client and server
 # TODO: there should be an automatic cleanup before setting CLOSED (e.g. _mgr.close(), deregistering); otherwise the subclass needs to access _mgr! Also, use __mgr!
 # Probably: replace set(CLOSED) by __close() or similar; it can also run FutureQueueSession.close()
 
+# TODO: If you close the session too quickly (run() finishes, all tasks are deleted by gc), it won't have enough time to finish them; a lot of errors. How to avoid writing await self._mgr.close()?
+
 class InteractiveSessionError(Exception):
   pass
 

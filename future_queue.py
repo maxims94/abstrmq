@@ -123,7 +123,7 @@ class FutureQueue(BasicQueue):
   :param on_drop: a callable of the form func(msg: QueueMessage, reason: FutureQueueDropReason). It is called every time a message is dropped in the DROP, WAIT and CIRCULAR modes
   """
   
-  def __init__(self, *args, mode : FutureQueueMode = FutureQueueMode.DROP, on_drop = None, buffer_size = 5, **kwargs):
+  def __init__(self, *args, mode : FutureQueueMode = FutureQueueMode.DROP, on_drop = None, buffer_size = 1000, **kwargs):
     super().__init__(*args, **kwargs)
     self._receive = []
     self._wait = []
@@ -166,7 +166,7 @@ class FutureQueue(BasicQueue):
           log.debug(f"Add to queue: {message}")
           self._wait.append(message) 
         else:
-          log.warning("Message buffer full: Drop message: {message!r}")
+          log.warning(f"Message buffer full: Drop message: {message!r}")
           self._on_drop(message, FutureQueueDropReason.FULL_BUFFER)
 
       if selected_mode is FutureQueueMode.DROP:
